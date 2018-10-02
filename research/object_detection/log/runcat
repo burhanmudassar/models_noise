@@ -1,0 +1,38 @@
+
+echo '**********************************'
+echo 'Baseline: clean'
+echo '**********************************'
+cat faster_rcnn_inception_v2_gtvir_200k_gaussian_0p00.log
+echo '**********************************'
+echo 'Baseline: sigma=0.15'
+echo '**********************************'
+cat faster_rcnn_inception_v2_gtvir_200k_gaussian_0p15.log
+echo '**********************************'
+echo 'Baseline: lowres 8x'
+echo '**********************************'
+cat faster_rcnn_inception_v2_gtvir_200k_lr8x.log
+
+echo '**********************************'
+echo 'Data augmentation: clean'
+echo '**********************************'
+cat faster_rcnn_inception_v2_gtvir_hrlr8x_gaussian0p00.log
+echo '**********************************'
+echo 'Data augmentation: sigma=0.15'
+echo '**********************************'
+cat faster_rcnn_inception_v2_gtvir_hrlr8x_gaussian0p15.log
+echo '**********************************'
+echo 'Data augmentation: lowres 8x'
+echo '**********************************'
+cat faster_rcnn_inception_v2_gtvir_hrlr8x_lr8x.log
+echo '**********************************'
+echo 'Denoise + gate network: clean'
+echo '**********************************'
+cat faster_rcnn_inception_v2_gtvir_gaussian_hrlr8x_avgfilter_denoise_noddiscrim_discrim_entirefinetune_gaussian0p00.log
+echo '**********************************'
+echo 'Denoise + gate network: sigma=0.15'
+echo '**********************************'
+cat faster_rcnn_inception_v2_gtvir_gaussian_hrlr8x_avgfilter_denoise_noddiscrim_discrim_entirefinetune_gaussian0p15.log
+echo '**********************************'
+echo 'Denoise + gate network: lowres 4x'
+echo '**********************************'
+cat faster_rcnn_inception_v2_gtvir_gaussian_hrlr8x_avgfilter_denoise_noddiscrim_discrim_entirefinetune_lr8x.log

@@ -1,0 +1,4 @@
+
+#CUDA_VISIBLE_DEVICES=1 python denoise_merge.py --gaussian_noise=True --denoise=True --average_filter=False --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_ref
+
+CUDA_VISIBLE_DEVICES=1 python discrim_merge.py --gaussian_noise=True --discrim=True --average_filter=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_discrim_ref

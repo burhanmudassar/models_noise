@@ -95,6 +95,25 @@ def freeze_gradients_matching_regex(grads_and_vars, regex_list):
     logging.info('Freezing variable [%s]', var.op.name)
   return kept_grads_and_vars
 
+def keep_gradients_matching_regex(grads_and_vars, regex_list):
+  """Freeze gradients whose variable names match a regular expression.
+
+  Args:
+    grads_and_vars: A list of gradient to variable pairs (tuples).
+    regex_list: A list of string regular expressions.
+
+  Returns:
+    grads_and_vars: A list of gradient to variable pairs (tuples) that do not
+      contain the variables and gradients matching the regex.
+  """
+  variables = [pair[1] for pair in grads_and_vars]
+  matching_vars = filter_variables(variables, regex_list, invert=False)
+  kept_grads_and_vars = [pair for pair in grads_and_vars
+                         if pair[1] not in matching_vars]
+  for var in matching_vars:
+    logging.info('Freezing variable [%s]', var.op.name)
+  return kept_grads_and_vars
+
 
 def get_variables_available_in_checkpoint(variables, checkpoint_path):
   """Returns the subset of variables available in the checkpoint.

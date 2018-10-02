@@ -85,6 +85,85 @@ class Loss(object):
     """
     pass
 
+class WeightedL2BidirectionLoss(Loss):
+  """L2 localization loss function with anchorwise output support.
+
+  Loss[b,a] = .5 * ||weights[b,a] * (prediction[b,a,:] - target[b,a,:])||^2
+  """
+
+  def __init__(self, anchorwise_output=False):
+    """Constructor.
+
+    Args:
+      anchorwise_output: Outputs loss per anchor. (default False)
+
+    """
+    self._anchorwise_output = anchorwise_output
+
+  def _compute_loss(self, prediction_tensor, target_tensor, weights):
+    """Compute loss function.
+
+    Args:
+      prediction_tensor: A float tensor of shape [batch_size/2 * num_anchors,
+        code_size] representing the (encoded) predicted locations of objects.
+      target_tensor: A float tensor of shape [batch_size/2 * num_anchors,
+        code_size] representing the regression targets
+      weights: a float scalar tensor
+
+    Returns:
+      loss: a (scalar) tensor representing the value of the loss function
+            or a float tensor of shape [batch_size, num_anchors]
+    """
+    num_classes = prediction_tensor.get_shape().as_list()[-1]
+    weighted_diff = tf.reshape(prediction_tensor, [-1, num_classes]) \
+        - tf.reshape(target_tensor, [-1, num_classes])
+    square_diff = tf.reduce_sum(0.5 * tf.square(weighted_diff), 1)
+    if self._anchorwise_output:
+      return tf.reshape(square_diff, tf.shape(weights)) * weights
+    return tf.reduce_sum(square_diff * tf.reshape(weights, [-1]))
+
+class WeightedL2PivotLoss(Loss):
+  """L2 localization loss function with anchorwise output support.
+
+  Loss[b,a] = .5 * ||weights[b,a] * (prediction[b,a,:] - target[b,a,:])||^2
+  """
+
+  def __init__(self, anchorwise_output=False):
+    """Constructor.
+
+    Args:
+      anchorwise_output: Outputs loss per anchor. (default False)
+
+    """
+    self._anchorwise_output = anchorwise_output
+
+  def _compute_loss(self, prediction_tensor, target_tensor, weights):
+    """Compute loss function.
+
+    Args:
+      prediction_tensor: A float tensor of shape [batch_size/2 * num_anchors,
+        code_size] representing the (encoded) predicted locations of objects.
+      target_tensor: A float tensor of shape [batch_size/2 * num_anchors,
+        code_size] representing the regression targets
+      weights: a float scalar tensor
+
+    Returns:
+      loss: a (scalar) tensor representing the value of the loss function
+            or a float tensor of shape [batch_size, num_anchors]
+    """
+    with tf.variable_scope('pivot') as scope:
+      pivot_tensor = tf.get_variable('pivot',
+          target_tensor.get_shape().as_list(), dtype=tf.float32,
+          initializer=tf.constant_initializer(0), trainable=False)
+      pivot_tensor = target_tensor
+    num_classes = prediction_tensor.get_shape().as_list()[-1]
+    weighted_diff = tf.reshape(prediction_tensor, [-1, num_classes]) \
+        - tf.reshape(pivot_tensor, [-1, num_classes])
+    square_diff = tf.reduce_sum(0.5 * tf.square(weighted_diff), 1)
+    if self._anchorwise_output:
+      return tf.reshape(square_diff, tf.shape(weights)) * weights
+    return tf.reduce_sum(square_diff * tf.reshape(weights, [-1]))
+
 
 class WeightedL2LocalizationLoss(Loss):
   """L2 localization loss function with anchorwise output support.

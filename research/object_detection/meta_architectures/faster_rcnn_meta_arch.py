@@ -80,8 +80,35 @@ from object_detection.core import target_assigner
 from object_detection.utils import ops
 from object_detection.utils import shape_utils
 
+#from denoise import denoise, ae
+
 slim = tf.contrib.slim
 
+flags = tf.app.flags
+FLAGS = flags.FLAGS
+
+def _batch_norm_arg_scope(list_ops,
+                          use_batch_norm=True,
+                          batch_norm_decay=0.9997,
+                          batch_norm_epsilon=0.001,
+                          batch_norm_scale=False,
+                          train_batch_norm=False):
+  """Slim arg scope for InceptionV2 batch norm."""
+  if use_batch_norm:
+    batch_norm_params = {
+        'is_training': train_batch_norm,
+        'scale': batch_norm_scale,
+        'decay': batch_norm_decay,
+        'epsilon': batch_norm_epsilon
+    }
+    normalizer_fn = slim.batch_norm
+  else:
+    normalizer_fn = None
+    batch_norm_params = None
+
+  return slim.arg_scope(list_ops,
+                        normalizer_fn=normalizer_fn,
+                        normalizer_params=batch_norm_params)
 
 class FasterRCNNFeatureExtractor(object):
   """Faster R-CNN Feature Extractor definition."""
@@ -152,7 +179,7 @@ class FasterRCNNFeatureExtractor(object):
         [batch_size * self.max_num_proposals, height, width, depth]
         representing box classifier features for each proposal.
     """
-    with tf.variable_scope(scope, values=[proposal_feature_maps]):
+    with tf.variable_scope(scope, values=[proposal_feature_maps], reuse=tf.AUTO_REUSE):
       return self._extract_box_classifier_features(proposal_feature_maps, scope)
 
   @abstractmethod
@@ -393,6 +420,23 @@ class FasterRCNNMetaArch(model.DetectionModel):
     self._second_stage_classification_loss = second_stage_classification_loss
     self._second_stage_mask_loss = (
         losses.WeightedSigmoidClassificationLoss(anchorwise_output=True))
+    # added for low-level similarity learning
+    if FLAGS.similarity_loss == 'pivot':
+      self._similarity_loss = (
+          losses.WeightedL2PivotLoss(anchorwise_output=False))
+      self._second_stage_similarity_loss = (
+          losses.WeightedL2PivotLoss(anchorwise_output=True))
+    elif FLAGS.similarity_loss == 'bidirection':
+      self._similarity_loss = (
+          losses.WeightedL2BidirectionLoss(anchorwise_output=False))
+      self._second_stage_similarity_loss = (
+          losses.WeightedL2BidirectionLoss(anchorwise_output=True))
+    else:
+      raise ValueError('Please choose between pivot and bidirection')
+
+    self._denoise_similarity_loss = (
+        losses.WeightedL2BidirectionLoss(anchorwise_output=False))
+
     self._second_stage_loc_loss_weight = second_stage_localization_loss_weight
     self._second_stage_cls_loss_weight = second_stage_classification_loss_weight
     self._second_stage_mask_loss_weight = (
@@ -658,6 +702,46 @@ class FasterRCNNMetaArch(model.DetectionModel):
 
     return prediction_dict
 
+  def denoise(self, preprocessed_inputs):
+    """Perform Denoising.
+
+    This function performs denoising:
+
+    Args:
+      preprocessed_inputs: a [batch, height, width, channels] image tensor.
+
+    Returns:
+      denoised_inputs: a [batch, height, width, channels] image tensor.
+
+    """
+    if FLAGS.denoise:
+      with tf.variable_scope('Denoise',
+                             reuse=self._feature_extractor._reuse_weights) as scope:
+        with _batch_norm_arg_scope([slim.conv2d, slim.separable_conv2d],
+                                   batch_norm_scale=True,
+                                   train_batch_norm=self._feature_extractor._train_batch_norm):
+          denoised_inputs, activations = denoise(
+              preprocessed_inputs,
+              num_depth=4,
+              num_filter_per_layer=64,
+              use_depthwise_conv=False,
+              scope=scope)
+#        denoised_inputs, activations = ae(
+#            preprocessed_inputs,
+#            batch_norm_scale=True,
+#            train_batch_norm=self._feature_extractor._train_batch_norm,
+#            scope=scope)
+    else:
+      denoised_inputs = preprocessed_inputs
+
+    prediction_dict = {
+        'preprocessed_images': preprocessed_inputs,
+        'denoised_images': denoised_inputs
+    }
+
+    return prediction_dict
+
+
   def _extract_rpn_feature_maps(self, preprocessed_inputs):
     """Extracts RPN features.
 
@@ -681,6 +765,7 @@ class FasterRCNNMetaArch(model.DetectionModel):
       image_shape: A 1-D tensor representing the input image shape.
     """
     image_shape = tf.shape(preprocessed_inputs)
+    # rpn_features_to_crop: activations['Mixed_4e']
     rpn_features_to_crop = self._feature_extractor.extract_proposal_features(
         preprocessed_inputs, scope=self.first_stage_feature_extractor_scope)
 
@@ -1257,6 +1342,37 @@ class FasterRCNNMetaArch(model.DetectionModel):
                       tf.stack([combined_shape[0], combined_shape[1],
                                 num_classes, 4]))
 
+  def denoise_loss(self, prediction_dict, scope=None):
+    """Compute scalar loss tensors given prediction tensors.
+
+    If first_stage_only=True, only RPN related losses are computed (i.e.,
+    `rpn_localization_loss` and `rpn_objectness_loss`).  Otherwise all
+    losses are computed.
+
+    Args:
+      prediction_dict: a dictionary holding prediction tensors (see the
+        documentation for the predict method.  If first_stage_only=True, we
+        expect prediction_dict to contain `rpn_box_encodings`,
+        `rpn_objectness_predictions_with_background`, `rpn_features_to_crop`,
+        `image_shape`, and `anchors` fields.  Otherwise we expect
+        prediction_dict to additionally contain `refined_box_encodings`,
+        `class_predictions_with_background`, `num_proposals`, and
+        `proposal_boxes` fields.
+      scope: Optional scope name.
+
+    Returns:
+      a dictionary mapping loss keys (`first_stage_localization_loss`,
+        `first_stage_objectness_loss`, 'second_stage_localization_loss',
+        'second_stage_classification_loss') to scalar tensors representing
+        corresponding loss values.
+    """
+    with tf.name_scope(scope, 'Loss', prediction_dict.values()):
+      loss_dict = self._loss_denoise(
+          prediction_dict['preprocessed_images'],
+          prediction_dict['denoised_images']
+          )
+    return loss_dict
+
   def loss(self, prediction_dict, scope=None):
     """Compute scalar loss tensors given prediction tensors.
 
@@ -1291,6 +1407,20 @@ class FasterRCNNMetaArch(model.DetectionModel):
           prediction_dict['anchors'],
           groundtruth_boxlists,
           groundtruth_classes_with_background_list)
+
+      if FLAGS.similarity_loss_factor > 0.:
+        loss_dict.update(
+            self._loss_similarity(
+                prediction_dict['rpn_features_to_crop']
+            ))
+
+#      if FLAGS.denoise:
+#        loss_dict.update(
+#            self._loss_denoise(
+#                prediction_dict['preprocessed_images'],
+#                prediction_dict['denoised_images']
+#            ))
+
       if not self._first_stage_only:
         loss_dict.update(
             self._loss_box_classifier(
@@ -1305,6 +1435,75 @@ class FasterRCNNMetaArch(model.DetectionModel):
                 groundtruth_masks_list,
             ))
     return loss_dict
+
+  def _loss_similarity(self, rpn_features_to_crop):
+    """Computes denoise loss tensors.
+    Assume we have
+    first half : embeddings from the noisy images
+    second half: embeddings from original images
+
+    """
+    with tf.name_scope('SimilarityLoss'):
+      # added for low-level similarity learning
+      print('rpn_features_to_crop')
+      print(rpn_features_to_crop)
+
+      # features_shape: (batch_size*(lowres+1), )
+      features_shape = rpn_features_to_crop.get_shape().as_list()
+      first_half  = rpn_features_to_crop[:features_shape[0]/2]
+      second_half = rpn_features_to_crop[features_shape[0]/2:]
+
+      sim_loss = self._similarity_loss(
+          first_half,
+          second_half,
+          weights=FLAGS.similarity_loss_factor)
+#          weights=FLAGS.similarity_loss_factor/features_shape[3])
+
+      loss_dict = {}
+      loss_dict['similarity_loss'] = (sim_loss)
+    return loss_dict
+
+
+  def _loss_denoise(self,
+                    preprocessed_images,
+                    denoised_images):
+    """Computes denoise loss tensors.
+    Assume we have
+    first half of the preprocessed_images: noisy images
+    second half of the preprocessed_images: original images
+    first half of the denoised_images: denoised images from the noisy images
+    second half of the denoised_images: denoised images from original images
+
+    """
+    with tf.name_scope('DenoiseLoss'):
+      # added for low-level similarity learning
+      print(preprocessed_images)
+      print(denoised_images)
+
+      # preprocessed_images_shape: (batch_size*(lowres+1), )
+      images_shape = preprocessed_images.get_shape().as_list()
+      original_images = preprocessed_images[images_shape[0]/2:]
+      first_half_denoised_images = denoised_images[:images_shape[0]/2]
+      second_half_denoised_images = denoised_images[images_shape[0]/2:]
+
+      denoise_sim_loss = self._denoise_similarity_loss(
+          original_images,
+          first_half_denoised_images,
+          weights=FLAGS.denoise_loss_factor)
+
+      denoise_sim_losses2 = self._denoise_similarity_loss(
+          original_images,
+          second_half_denoised_images,
+          weights=FLAGS.denoise_loss_factor)
+      denoise_sim_loss += denoise_sim_losses2
+
+      loss_dict = {}
+      loss_dict['denoise_similarity_loss'] = (
+          denoise_sim_loss)
+    return loss_dict
+
+
+
 
   def _loss_rpn(self,
                 rpn_box_encodings,
@@ -1495,6 +1694,51 @@ class FasterRCNNMetaArch(model.DetectionModel):
           class_predictions_with_background,
           batch_cls_targets_with_background,
           weights=batch_cls_weights) / normalizer
+
+      # added for low-level similarity learning
+      print(refined_box_encodings)
+      print(refined_box_encodings_with_background)
+      print(batch_size)
+      print(refined_box_encodings_masked_by_class_targets)
+      print(reshaped_refined_box_encodings)
+      print(batch_reg_targets)
+      print(second_stage_loc_losses)
+      print(class_predictions_with_background)
+      print(batch_cls_targets_with_background)
+      print(second_stage_cls_losses)
+      print(batch_cls_weights)
+      print(normalizer)
+      # predictions_shape: (batch_size*64*(lowres+1), 91)
+      # normalizer shape: [batch_size*(lowres+1), 64]
+      predictions_shape = class_predictions_with_background.get_shape().as_list()
+      first_half_class_predictions_with_background \
+          = class_predictions_with_background[:predictions_shape[0]/2]
+      if predictions_shape[0] > 1:
+        second_half_class_predictions_with_background \
+            = class_predictions_with_background[predictions_shape[0]/2:]
+      else:
+        second_half_class_predictions_with_background \
+            = first_half_class_predictions_with_background
+      second_stage_cls_sim_losses = self._second_stage_similarity_loss(
+          first_half_class_predictions_with_background,
+          second_half_class_predictions_with_background,
+          weights=batch_cls_weights[:batch_size/2]) / normalizer[:batch_size/2]
+      second_stage_cls_sim_loss = tf.reduce_sum(
+          tf.boolean_mask(second_stage_cls_sim_losses, paddings_indicator[:batch_size/2]))
+
+
+      tf.summary.tensor_summary('refined_box_encodings_with_background',
+                                 refined_box_encodings_with_background)
+      tf.summary.tensor_summary('reshaped_refined_box_encodings',
+                                 reshaped_refined_box_encodings)
+      tf.summary.tensor_summary('batch_reg_targets', batch_reg_targets)
+      tf.summary.tensor_summary('batch_cls_targets_with_background',
+                                 batch_cls_targets_with_background)
+      tf.summary.tensor_summary('batch_reg_weights', batch_reg_weights)
+      tf.summary.tensor_summary('batch_cls_weights', batch_cls_weights)
+      tf.summary.tensor_summary('normalizer', normalizer)
+      tf.summary.tensor_summary('paddings_indicator', paddings_indicator)
+
       second_stage_loc_loss = tf.reduce_sum(
           tf.boolean_mask(second_stage_loc_losses, paddings_indicator))
       second_stage_cls_loss = tf.reduce_sum(
@@ -1506,6 +1750,10 @@ class FasterRCNNMetaArch(model.DetectionModel):
             proposal_boxlists, second_stage_loc_losses,
             second_stage_cls_losses, num_proposals)
       loss_dict = {}
+      if FLAGS.second_stage_similarity_loss_factor > 0.:
+        with tf.name_scope('similarity_loss'):
+          loss_dict['second_stage_similarity_loss'] = (
+              FLAGS.second_stage_similarity_loss_factor * second_stage_cls_sim_loss)
       with tf.name_scope('localization_loss'):
         loss_dict['second_stage_localization_loss'] = (
             self._second_stage_loc_loss_weight * second_stage_loc_loss)

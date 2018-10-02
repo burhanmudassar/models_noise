@@ -298,7 +298,7 @@ def resnet_v1_101(inputs,
   return resnet_v1(inputs, blocks, num_classes, is_training,
                    global_pool=global_pool, output_stride=output_stride,
                    include_root_block=True, spatial_squeeze=spatial_squeeze,
-                   reuse=reuse, scope=scope)
+                   reuse=tf.AUTO_REUSE, scope=scope)
 resnet_v1_101.default_image_size = resnet_v1.default_image_size
 
 

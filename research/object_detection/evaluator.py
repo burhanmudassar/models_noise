@@ -25,6 +25,15 @@ from object_detection import eval_util
 from object_detection.core import prefetcher
 from object_detection.core import standard_fields as fields
 from object_detection.utils import object_detection_evaluation
+#from denoise import discrim, discrim_loss
+from collections import namedtuple
+from module import *
+import re
+import time
+TOWER_NAME = 'tower'
+
+flags = tf.app.flags
+FLAGS = flags.FLAGS
 
 # A dictionary of metric names to classes that implement the metric. The classes
 # in the dictionary must implement
@@ -38,6 +47,183 @@ EVAL_METRICS_CLASS_DICT = {
         object_detection_evaluation.OpenImagesDetectionEvaluator
 }
 
+def activation_summary(x):
+  """Helper to create summaries for activations.
+
+  Creates a summary that provides a histogram of activations.
+  Creates a summary that measures the sparsity of activations.
+
+  Args:
+    x: Tensor
+  Returns:
+    nothing
+  """
+  # Remove 'tower_[0-9]/' from the name in case this is a multi-GPU training
+  # session. This helps the clarity of presentation on tensorboard.
+  tensor_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', x.op.name)
+  tf.summary.histogram(tensor_name + '/activations', x)
+  tf.summary.scalar(tensor_name + '/sparsity',
+                                       tf.nn.zero_fraction(x))
+
+def get_median_filter_image(image, filter_size=3):
+
+  image_shape = tf.shape(image)
+  num_batch = image_shape[0]
+  height = image_shape[1]
+  width = image_shape[2]
+
+  # uniform [1 - ratio, 2 - ratio)
+  patches = tf.extract_image_patches(image, [1, filter_size, filter_size, 1],
+                                     4*[1], 4*[1], 'SAME')
+  medians = tf.contrib.distributions.percentile(patches, 50, axis=3)
+  print (image.get_shape().as_list())
+  print (patches.get_shape().as_list())
+  print (medians.get_shape().as_list())
+
+  return medians
+
+def get_salt_pepper_noise_image(image, ratio=0.01, rand_stddev=False):
+
+  image_shape = tf.shape(image)
+  num_batch = image_shape[0]
+  height = image_shape[1]
+  width = image_shape[2]
+
+  # uniform [1 - ratio, 2 - ratio)
+  random_tensor = 1. - ratio
+  random_tensor += tf.random_uniform(image_shape)
+  # 0: ratio, 1: 1 - ratio
+  binary_tensor = tf.floor(random_tensor)
+
+  # scale image from [-1, 1] to [0, 1]
+  random_tensor2 = tf.random_uniform(image_shape)
+  image = (image + 1.)/2.
+  noise_image = binary_tensor*image + (1.-binary_tensor)*random_tensor2
+
+  # scaling pixel values to be in [-1, 1]).
+  noise_image = tf.clip_by_value(noise_image*2.-1, -1, 1)
+  return noise_image
+
+def get_gaussian_noise_image(image, stddev=0.15, rand_stddev=False):
+
+  image_shape = tf.shape(image)
+  num_batch = image_shape[0]
+  height = image_shape[1]
+  width = image_shape[2]
+  
+  if rand_stddev:
+    sigma = tf.abs(tf.truncated_normal([num_batch], mean=0., stddev=stddev/2))
+  else:
+    sigma = stddev
+  # since preprocessed input values are in [-1, 1], we use sigma*2
+  noise = tf.random_normal(image_shape, mean=0., stddev=sigma*2)
+  # scaling pixel values to be in [-1, 1]).
+  noise_image = tf.clip_by_value(image + noise, -1, 1)
+  return noise_image
+
+def get_lowres_image(image, factor=1, method=0, upsample=True):
+  # image shape: [1, None, None, 3]
+  image_shape = tf.shape(image)
+  height = image_shape[1]
+  width = image_shape[2]
+
+  # subsample
+  down_height = tf.to_int32(height/factor)
+  down_width = tf.to_int32(width/factor)
+  downsampled_image = tf.image.resize_images(image,
+                                        [down_height, down_width])
+
+  # resize
+  upsampled_image = downsampled_image
+  if upsample:
+    upsampled_image = tf.image.resize_images(downsampled_image,
+                                            [height, width], method=method)
+  return upsampled_image
+
+def average_filter(images, filter_size):
+  images = tf.nn.avg_pool(images,
+                          ksize=[1, filter_size, filter_size, 1],
+                          strides=4*[1], padding='SAME')
+  return images
+
+def resize_dividable_image(image, number):
+  # image shape: [1, None, None, 3]
+
+  image_shape = tf.shape(image)
+  height = image_shape[1]/number*number
+  width = image_shape[2]/number*number
+  return tf.image.resize_images(image, [height, width])
+  
+def gated_denoise(images, is_training, FLAGS):
+  # Discriminator Network
+  # We are just mixing the two images
+  losses_dict = {}
+  summaries_dict = {}
+
+  OPTIONS = namedtuple('OPTIONS', 'gf_dim df_dim output_c_dim is_training')
+  options = OPTIONS._make((FLAGS.ngf, FLAGS.ndf, 3, is_training))
+  criterionGAN = mae_criterion
+  criterionGAN2 = sce_criterion
+  
+  # Filter
+  summaries_dict['prefiltered_noisy_images'] = tf.summary.image('prefiltered_noisy_images', images, max_outputs=1)
+
+  filtered_images = images
+  if FLAGS.average_filter:
+    if FLAGS.mixture_of_filters:
+      with tf.variable_scope('filter_gate') as scope:
+        print('Building mixture of filters model')
+        filtered_images0 = average_filter(images, 2)
+        filtered_images1 = average_filter(images, 3)
+        filtered_images2 = average_filter(images, 4)
+        probs = gate(images, FLAGS.ndf, num_classes=4, reuse=False, name='gate')
+        activation_summary(probs)
+        filtered_images = tf.add_n([probs[:,0,None,None,None]*images,
+                                    probs[:,1,None,None,None]*filtered_images0,
+                                    probs[:,2,None,None,None]*filtered_images1,
+                                    probs[:,3,None,None,None]*filtered_images2])
+    else:
+      filtered_images = average_filter(images, FLAGS.filter_size)
+    summaries_dict['filtered_noisy_images'] = tf.summary.image('filtered_noisy_images', filtered_images, max_outputs=1)
+
+  if FLAGS.denoise:
+    with tf.variable_scope('denoise') as scope:
+      if FLAGS.generator_separate_channel:
+        denoised_images = generator_separate_resnet(filtered_images, options, res_depth=FLAGS.res_depth, reuse=False, name='generator') 
+      else:
+        denoised_images = generator_resnet(filtered_images, options, res_depth=FLAGS.res_depth, output_c_dim=3, reuse=False, name='generator') 
+      if FLAGS.denoise_discrim:
+        noisy_and_denoised = tf.concat([noisy_images, denoised_images], 3)
+        d_denoised = discriminator(denoised, FLAGS.ndf, FLAGS.ks, reuse=False, name='discriminator')
+
+    filtered_images = denoised_images
+    summaries_dict['filtered_noisy_images'] = tf.summary.image('filtered_noisy_images', filtered_images, max_outputs=1)
+
+  # Gate Operation
+  if FLAGS.discrim:
+    with tf.variable_scope('input_discrim') as scope:
+      d_in_logits = discriminator(images, FLAGS.ndf, FLAGS.ks, reuse=False, name='discriminator')
+      d_in_logits = tf.reduce_mean(d_in_logits, [1, 2, 3])
+      d_in_sigmoid = tf.nn.sigmoid(d_in_logits, name='is_clean')
+      activation_summary(d_in_sigmoid)
+      images =  tf.add(d_in_sigmoid[:,None,None,None] * images,
+                       (1 - d_in_sigmoid[:,None,None,None]) * filtered_images)
+  else:
+    images = filtered_images
+
+  summaries_dict['preprocessed_noisy_images'] = tf.summary.image('preprocessed_noisy_images', images, max_outputs=1)
+
+  return images, filtered_images, losses_dict, summaries_dict
+
+def inception_preprocess(images):
+  """ [0, 255] --> [-1, 1]
+  """
+  return (2.0 / 255.0) * images - 1.0 
+
+def inception_depreprocess(images):
+  """ [-1, 1] --> [0, 255]
+  """
+  return (255.0 / 2.0) * (images + 1.0)
 
 def _extract_prediction_tensors(model,
                                 create_input_dict_fn,
@@ -56,9 +242,73 @@ def _extract_prediction_tensors(model,
   prefetch_queue = prefetcher.prefetch(input_dict, capacity=500)
   input_dict = prefetch_queue.dequeue()
   original_image = tf.expand_dims(input_dict[fields.InputDataFields.image], 0)
-  preprocessed_image = model.preprocess(tf.to_float(original_image))
-  prediction_dict = model.predict(preprocessed_image)
+
+
+  preprocessed_image = inception_preprocess(tf.to_float(original_image))
+
+  tf.summary.image('preprocessed_images', preprocessed_image[0])
+
+  if FLAGS.salt_pepper_noise:
+    preprocessed_image = get_salt_pepper_noise_image(preprocessed_image,
+                                                     ratio=FLAGS.ratio)
+    tf.summary.image('salt_pepper_noise_images', preprocessed_image[0])
+  if FLAGS.gaussian_noise:
+    preprocessed_image = get_gaussian_noise_image(preprocessed_image,
+                                                  stddev=FLAGS.stddev)
+    tf.summary.image('gaussian_noise_images', preprocessed_image[0])
+  if FLAGS.lowres:
+    preprocessed_image = get_lowres_image(preprocessed_image,
+                                    factor=FLAGS.subsample_factor,
+                                    method=FLAGS.resize_method,
+                                    upsample=FLAGS.upsample)
+    tf.summary.image('lowres_images', preprocessed_image[0])
+  
+  # prefiltered_image
+  prefiltered_image = preprocessed_image
+  tf.summary.image('prefiltered_images', prefiltered_image[0])
+
+#  # apply filter here
+#  if FLAGS.median_filter:
+#    preprocessed_image = get_median_filter_image(preprocessed_image,
+#                                                 filter_size=FLAGS.filter_size)
+#    tf.summary.image('median_filter_images', preprocessed_image[0])
+#
+#  if FLAGS.average_filter:
+#    preprocessed_image = tf.nn.avg_pool(preprocessed_image,
+#                            ksize=[1, FLAGS.filter_size, FLAGS.filter_size, 1],
+#                            strides=4*[1], padding='SAME')
+#    tf.summary.image('average_filter_images', preprocessed_image[0])
+#    if FLAGS.discrim:
+#      with tf.variable_scope('discrim') as scope:
+#        discrim_logits, _ = discrim(prefiltered_image,
+#                                    train_batch_norm=model._is_training)
+#        discrim_softmax = tf.nn.softmax(discrim_logits, name='softmax')
+#        preprocessed_image =  tf.add(discrim_softmax[:,0,None,None,None]*prefiltered_image,
+#                                     discrim_softmax[:,1,None,None,None]*preprocessed_image)
+#
+#  # Denoise
+#  prediction_dict = model.denoise(preprocessed_image)
+#  preprocessed_image = prediction_dict['denoised_images']
+
+
+  # Gated denoise
+  preprocessed_image = resize_dividable_image(preprocessed_image, 4)
+  preprocessed_image, filtered_image, losses_dict, summaries_dict = gated_denoise(preprocessed_image, False, FLAGS)
+  prediction_dict = {}
+  preprocessed_image_for_summary = preprocessed_image
+
+  # deprocess and preprocess with model's preprocess
+  preprocessed_image = inception_depreprocess(preprocessed_image)
+  preprocessed_image = model.preprocess(preprocessed_image)
+#  prediction_dict = model.predict(preprocessed_image)
+  prediction_dict.update(model.predict(preprocessed_image))
   detections = model.postprocess(prediction_dict)
+
+  # original image
+  # change preprocessed_image to uint8 image tensor
+  filtered_image = tf.to_int32(255 * (filtered_image + 1) / 2)
+  prefiltered_image = tf.to_int32(255 * (prefiltered_image + 1) / 2)
+  preprocessed_image = tf.to_int32(255 * (preprocessed_image_for_summary + 1) / 2)
 
   groundtruth = None
   if not ignore_groundtruth:
@@ -83,6 +333,9 @@ def _extract_prediction_tensors(model,
 
   return eval_util.result_dict_for_single_example(
       original_image,
+      prefiltered_image,
+      filtered_image,
+      preprocessed_image,
       input_dict[fields.InputDataFields.source_id],
       detections,
       groundtruth,
@@ -91,7 +344,7 @@ def _extract_prediction_tensors(model,
       scale_to_absolute=True)
 
 
-def get_evaluators(eval_config, categories):
+def get_evaluators(eval_config, categories, matching_iou_thresholds=None):
   """Returns the evaluator class according to eval_config, valid for categories.
 
   Args:
@@ -106,14 +359,18 @@ def get_evaluators(eval_config, categories):
   eval_metric_fn_key = eval_config.metrics_set
   if eval_metric_fn_key not in EVAL_METRICS_CLASS_DICT:
     raise ValueError('Metric not found: {}'.format(eval_metric_fn_key))
-  return [
-      EVAL_METRICS_CLASS_DICT[eval_metric_fn_key](
-          categories=categories)
-  ]
+  if matching_iou_thresholds is not None:
+    result = [EVAL_METRICS_CLASS_DICT[eval_metric_fn_key](
+              categories=categories, matching_iou_threshold=threshold)
+              for threshold in matching_iou_thresholds]
+    return result
+  else:
+    return [EVAL_METRICS_CLASS_DICT[eval_metric_fn_key](
+          categories=categories)]
 
 
 def evaluate(create_input_dict_fn, create_model_fn, eval_config, categories,
-             checkpoint_dir, eval_dir):
+             matching_iou_thresholds, checkpoint_dir, eval_dir):
   """Evaluation function for detection models.
 
   Args:
@@ -122,6 +379,8 @@ def evaluate(create_input_dict_fn, create_model_fn, eval_config, categories,
     eval_config: a eval_pb2.EvalConfig protobuf.
     categories: a list of category dictionaries. Each dict in the list should
                 have an integer 'id' field and string 'name' field.
+    matching_iou_thresholds: list of IOU threshold to use for matching
+                             groundtruth boxes to detection boxes.
     checkpoint_dir: directory to load the checkpoints to evaluate from.
     eval_dir: directory to write evaluation metrics summary to.
 
@@ -195,7 +454,7 @@ def evaluate(create_input_dict_fn, create_model_fn, eval_config, categories,
   metrics = eval_util.repeated_checkpoint_run(
       tensor_dict=tensor_dict,
       summary_dir=eval_dir,
-      evaluators=get_evaluators(eval_config, categories),
+      evaluators=get_evaluators(eval_config, categories, matching_iou_thresholds),
       batch_processor=_process_batch,
       checkpoint_dirs=[checkpoint_dir],
       variables_to_restore=None,

@@ -689,6 +689,7 @@ class SSDMetaArch(model.DetectionModel):
       A dict mapping variable names (to load from a checkpoint) to variables in
       the model graph.
     """
+
     variables_to_restore = {}
     for variable in tf.global_variables():
       if variable.op.name.startswith(self._extract_features_scope):
@@ -698,3 +699,33 @@ class SSDMetaArch(model.DetectionModel):
                                var_name)[-1])
         variables_to_restore[var_name] = variable
     return variables_to_restore
+
+    # variables_to_restore = {}
+    # for variable in tf.global_variables():
+    #   var_name = variable.op.name
+    #   if from_detection_checkpoint is True:
+    #       variables_to_restore[var_name] = variable
+    #   else:
+    #       if variable.op.name.startswith(self._extract_features_scope):
+    #         var_name = variable.op.name
+    #         if not from_detection_checkpoint:
+    #           var_name = (re.split('^' + self._extract_features_scope + '/',
+    #                                var_name)[-1])
+    #         variables_to_restore[var_name] = variable
+    # return variables_to_restore
+
+
+  # for variable in tf.global_variables():
+  #     var_name = variable.op.name
+  #     if (fine_tune_checkpoint_type == 'detection' and
+  #             load_all_detection_checkpoint_vars):
+  #         variables_to_restore[var_name] = variable
+  #     else:
+  #         if var_name.startswith(self._extract_features_scope):
+  #             if fine_tune_checkpoint_type == 'classification':
+  #                 var_name = (
+  #                     re.split('^' + self._extract_features_scope + '/',
+  #                              var_name)[-1])
+  #             variables_to_restore[var_name] = variable
+
+  # return variables_to_restore

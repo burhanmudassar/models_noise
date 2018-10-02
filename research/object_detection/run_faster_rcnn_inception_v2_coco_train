@@ -1,0 +1,5 @@
+
+#CUDA_VISIBLE_DEVICES=1 python train.py --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_train
+#CUDA_VISIBLE_DEVICES=1 python train.py --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_400k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_train
+CUDA_VISIBLE_DEVICES=1 python train.py --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_train
+#CUDA_VISIBLE_DEVICES=1 python train.py --gaussian_noise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_train

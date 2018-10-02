@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#CUDA_VISIBLE_DEVICES="0" python export_inference_graph.py --discrim=True --average_filter=True --denoise=True --pipeline_config_path=checkpoints/rfcn_resnet101_gtvir_gaussian_hrlr8x_avgfilter_denoise_noddiscrim_discrim_entirefinetune_100k/pipeline.config --trained_checkpoint_prefix=checkpoints/rfcn_resnet101_gtvir_gaussian_hrlr8x_avgfilter_denoise_noddiscrim_discrim_entirefinetune_100k/model.ckpt-107150 --output_directory=checkpoints/rfcn_resnet101_gtvir_gaussian_hrlr8x_avgfilter_denoise_noddiscrim_discrim_entirefinetune_100k/frozen_graph/
+CUDA_VISIBLE_DEVICES="1" python export_inference_graph.py --discrim=True --average_filter=True --denoise=True --pipeline_config_path=checkpoints/rfcn_resnet101_gtvir_noise_merged_trained/pipeline.config --trained_checkpoint_prefix=checkpoints/rfcn_resnet101_gtvir_noise_merged_trained/model.ckpt-44417 --output_directory=checkpoints/rfcn_resnet101_gtvir_noise_merged_trained/frozen_graph/
+
+CUDA_VISIBLE_DEVICES="1" python export_inference_graph.py --discrim=True --average_filter=True --denoise=True --pipeline_config_path=checkpoints/rfcn_resnet101_coco_gaussian_hrlr8x_avgfilter_denoise_noddiscrim_discrim_entirefinetune/pipeline.config --trained_checkpoint_prefix=checkpoints/rfcn_resnet101_coco_gaussian_hrlr8x_avgfilter_denoise_noddiscrim_discrim_entirefinetune/model.ckpt-7236214 --output_directory=checkpoints/rfcn_resnet101_coco_gaussian_hrlr8x_avgfilter_denoise_noddiscrim_discrim_entirefinetune/frozen_graph/
+
+
+# SSD MobileNet LR 4x
+# CUDA_VISIBLE_DEVICES="0" python export_inference_graph.py --pipeline_config_path=checkpoints/ssd_mobilenet_v1_coco_50k/pipeline.config --trained_checkpoint_prefix=checkpoints/ssd_mobilenet_v1_coco_50k/model.ckpt-7489147 --output_directory=checkpoints/ssd_mobilenet_v1_coco_50k/frozen_graph/
+

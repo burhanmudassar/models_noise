@@ -1,0 +1,117 @@
+
+#CUDA_VISIBLE_DEVICES=1 python train.py --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_train
+#CUDA_VISIBLE_DEVICES=1 python train.py --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_400k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_train
+#CUDA_VISIBLE_DEVICES=1 python train.py --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_train
+#CUDA_VISIBLE_DEVICES=1 python train.py --gaussian_noise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian
+#CUDA_VISIBLE_DEVICES=1 python train.py --gaussian_noise=True --similarity_loss_factor=0.001 --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_similarity1e-3
+#CUDA_VISIBLE_DEVICES=1 python train.py --salt_pepper_noise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_saltpepper
+#CUDA_VISIBLE_DEVICES=1 python train.py --gaussian_noise=True --average_filter=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter
+
+#CUDA_VISIBLE_DEVICES=1 python train.py --gaussian_noise=True --similarity_loss_factor=0.00001 --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_similarity1e-5
+#CUDA_VISIBLE_DEVICES=1 python train.py --gaussian_noise=True --similarity_loss_factor=0.0001 --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_similarity1e-4
+#CUDA_VISIBLE_DEVICES=1 python train.py --gaussian_noise=True --average_filter=True --similarity_loss_factor=0.00001 --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_similarity1e-5
+#CUDA_VISIBLE_DEVICES=1 python train.py --gaussian_noise=True --average_filter=True --similarity_loss_factor=0.0001 --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_similarity1e-4
+
+#CUDA_VISIBLE_DEVICES=1 python train.py --gaussian_noise=True --denoise_loss_factor=1 --similarity_loss_factor=0.00001 --denoise=True --average_filter=False --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_denoise.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_similarity1e-5
+
+#CUDA_VISIBLE_DEVICES=1 python train.py --gaussian_noise=True --discrim=True --average_filter=True --similarity_loss_factor=0.00001 --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_discrim.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_discrim_avgfilter_similarity1e-5
+
+#CUDA_VISIBLE_DEVICES=1 python train.py --gaussian_noise=True --discrim=True --average_filter=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_discrim.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_discrim_avgfilter
+
+# merge with denoise NN trained with adversarial training
+#CUDA_VISIBLE_DEVICES=1 python train.py --merge=True --gaussian_noise=True --discrim=True --denoise=True --denoise_discrim=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --preprocessing_checkpoint=checkpoints/gaussian_denoise_discrim/model.ckpt-40000 --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_discrim_ref
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_discrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_discrim/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_discrim_ref/checkpoint checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_discrim/.
+
+#CUDA_VISIBLE_DEVICES=0 python train.py --res_depth=9 --gaussian_noise=True --discrim=True --denoise=True --denoise_discrim=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_denoise_discrim.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_discrim
+#CUDA_VISIBLE_DEVICES=1 python train.py --frcnn_only_training=True --res_depth=3 --gaussian_noise=True --discrim=True --denoise=True --denoise_discrim=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_denoise_discrim.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_discrim
+#CUDA_VISIBLE_DEVICES=1 python train.py --fine_tune_denoisenet_for_object_detection=True --res_depth=3 --gaussian_noise=True --discrim=True --denoise=True --denoise_discrim=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_denoise_discrim.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_discrim_finetune
+
+#CUDA_VISIBLE_DEVICES=0 python train.py --gaussian_noise=True --lowres=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_lowres
+
+#CUDA_VISIBLE_DEVICES=1 python train.py --fine_tune_denoisenet_for_object_detection=True --res_depth=3 --gaussian_noise=True --discrim=True --average_filter=True --denoise=True --denoise_discrim=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_denoise_discrim.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_denoise_discrim_finetune
+
+# merge with denoise NN trained with adversarial training
+#CUDA_VISIBLE_DEVICES=1 python train.py --merge=True --ngf=4 --generator_separate_channel=True --gaussian_noise=True --discrim=True --average_filter=True --denoise=True --denoise_discrim=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --preprocessing_checkpoint=checkpoints/gaussian_avgfilter_separatedenoisengf4_discrim/model.ckpt-40000 --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_separatedenoisengf4_discrim_ref
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_separatedenoisengf4_discrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_separatedenoisengf4_discrim/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_separatedenoisengf4_discrim_ref/checkpoint          checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_separatedenoisengf4_discrim/.
+#CUDA_VISIBLE_DEVICES=1 python train.py --frcnn_only_training=True --res_depth=3 --gaussian_noise=True --discrim=True --ngf=4 --generator_separate_channel=True --average_filter=True --denoise=True --denoise_discrim=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_avgfilter_denoise_discrim.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_separatedenoisengf4_discrim
+
+# merge with denoise NN trained with adversarial training
+#CUDA_VISIBLE_DEVICES=0 python train.py --merge=True --gaussian_noise=True --discrim=True --average_filter=True --mixture_of_filters=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --preprocessing_checkpoint=checkpoints/gaussian_mixavgfilters_discrim/model.ckpt-50000 --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_mixavgfilters_discrim_ref
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_mixavgfilters_discrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussian_mixavgfilters_discrim/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_mixavgfilters_discrim_ref/checkpoint          checkpoints/faster_rcnn_inception_v2_coco_gaussian_mixavgfilters_discrim/.
+#CUDA_VISIBLE_DEVICES=1 python train.py --res_depth=3 --gaussian_noise=True --discrim=True --average_filter=True --mixture_of_filters=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_mixavgfilters_discrim.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_mixavgfilters_discrim
+
+#CUDA_VISIBLE_DEVICES=1 python train.py --merge=True --gaussian_noise=True --discrim=True --average_filter=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --preprocessing_checkpoint=checkpoints/gaussian_avgfilter_discrim/model.ckpt-40000 --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_discrim_ref
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_discrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussian_lr_avgfilter_discrim/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_discrim_ref/checkpoint          checkpoints/faster_rcnn_inception_v2_coco_gaussian_lr_avgfilter_discrim/.
+#CUDA_VISIBLE_DEVICES=1 python train.py --gaussian_noise=True --lowres=True --discrim=True --average_filter=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_avgfilter_discrim.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_lr_avgfilter_discrim
+
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_discrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussian_lr_avgfilter_discrim_similarity1e-5/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_discrim_ref/checkpoint          checkpoints/faster_rcnn_inception_v2_coco_gaussian_lr_avgfilter_discrim_similarity1e-5/.
+#CUDA_VISIBLE_DEVICES=0 python train.py --similarity_loss_factor=0.00001 --gaussian_noise=True --lowres=True --discrim=True --average_filter=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_avgfilter_discrim.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_lr_avgfilter_discrim_similarity1e-5
+
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_discrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussian_lr_avgfilter_discrim_frcnnonlyfinetune/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_discrim_ref/checkpoint          checkpoints/faster_rcnn_inception_v2_coco_gaussian_lr_avgfilter_discrim_frcnnonlyfinetune/.
+#CUDA_VISIBLE_DEVICES=1 python train.py --frcnn_only_training=True --gaussian_noise=True --lowres=True --discrim=True --average_filter=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_avgfilter_discrim.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_lr_avgfilter_discrim_frcnnonlyfinetune
+
+#CUDA_VISIBLE_DEVICES=0 python train.py --gaussian_noise=True --lowres=True --discrim=False --average_filter=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_lr_avgfilter
+
+##########################
+# average filter + denoise
+##########################
+#CUDA_VISIBLE_DEVICES=0 python train.py --merge=True --gaussian_noise=True --discrim=True --denoise_discrim=True --average_filter=True --denoise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --preprocessing_checkpoint=preprocess_checkpoints/gaussian_avgfilter_denoise_discrim/model.ckpt-14518 --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_denoise_discrim_ref
+#CUDA_VISIBLE_DEVICES=0 python train.py --merge=True --gaussian_noise=True --discrim=True --denoise_discrim=False --average_filter=True --denoise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --preprocessing_checkpoint=preprocess_checkpoints/gaussian_avgfilter_denoise_discrim/model.ckpt-14518 --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_denoise_noddiscrim_discrim_ref
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_denoise_discrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_discrim/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_denoise_discrim_ref/checkpoint          checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_discrim/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_denoise_noddiscrim_discrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_noddiscrim_discrim_entirefinetune/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_denoise_noddiscrim_discrim_ref/checkpoint          checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_noddiscrim_discrim_entirefinetune/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_denoise_noddiscrim_discrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_noddiscrim_discrim_frcnnonlyfinetune/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_denoise_noddiscrim_discrim_ref/checkpoint          checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_noddiscrim_discrim_frcnnonlyfinetune/.
+#CUDA_VISIBLE_DEVICES=0 python train.py --gaussian_noise=True --lowres=True --discrim=True --average_filter=True --denoise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_avgfilter_denoise_noddiscrim_discrim.config --frcnn_only_training=True --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_noddiscrim_discrim_frcnnonlyfinetune
+#CUDA_VISIBLE_DEVICES=1 python train.py --gaussian_noise=True --lowres=True --discrim=True --average_filter=True --denoise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_avgfilter_denoise_noddiscrim_discrim.config --entire_finetune=True --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_noddiscrim_discrim_entirefinetune
+
+#CUDA_VISIBLE_DEVICES=1 python train.py --merge=True --gaussian_noise=True --discrim=False --denoise_discrim=False --average_filter=True --denoise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --preprocessing_checkpoint=preprocess_checkpoints/gaussian_avgfilter_denoise_discrim/model.ckpt-14518 --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_denoise_noddiscrim_ref
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_denoise_noddiscrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_noddiscrim_entirefinetune/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_denoise_noddiscrim_ref/checkpoint          checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_noddiscrim_entirefinetune/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_denoise_noddiscrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_noddiscrim_frcnnonlyfinetune/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_avgfilter_denoise_noddiscrim_ref/checkpoint          checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_noddiscrim_frcnnonlyfinetune/.
+#CUDA_VISIBLE_DEVICES=1 python train.py --gaussian_noise=True --lowres=True --discrim=False --average_filter=True --denoise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_avgfilter_denoise_noddiscrim.config --frcnn_only_training=True --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_noddiscrim_frcnnonlyfinetune
+CUDA_VISIBLE_DEVICES=0 python train.py --gaussian_noise=True --lowres=True --discrim=False --average_filter=True --denoise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_avgfilter_denoise_noddiscrim.config --entire_finetune=True --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_noddiscrim_entirefinetune
+
+
+##########################
+# denoise
+##########################
+#CUDA_VISIBLE_DEVICES=1 python train.py --merge=True --gaussian_noise=True --discrim=True --denoise_discrim=True --average_filter=False --denoise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --preprocessing_checkpoint=preprocess_checkpoints/gaussian_denoise_discrim/model.ckpt-23170 --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_discrim_ref
+#CUDA_VISIBLE_DEVICES=1 python train.py --merge=True --gaussian_noise=True --discrim=True --denoise_discrim=False --average_filter=False --denoise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --preprocessing_checkpoint=preprocess_checkpoints/gaussian_denoise_discrim/model.ckpt-23170 --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_noddiscrim_discrim_ref
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_discrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_denoise_discrim/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_discrim_ref/checkpoint          checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_denoise_discrim/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_noddiscrim_discrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_denoise_noddiscrim_discrim_entirefinetune/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_noddiscrim_discrim_ref/checkpoint          checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_denoise_noddiscrim_discrim_entirefinetune/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_noddiscrim_discrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_denoise_noddiscrim_discrim_frcnnonlyfinetune/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussian_denoise_noddiscrim_discrim_ref/checkpoint          checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_denoise_noddiscrim_discrim_frcnnonlyfinetune/.
+#CUDA_VISIBLE_DEVICES=1 python train.py --gaussian_noise=True --lowres=True --discrim=True --average_filter=False --denoise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_denoise_noddiscrim_discrim.config --frcnn_only_training=True --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_denoise_noddiscrim_discrim_frcnnonlyfinetune
+
+
+##########################
+# Discrim
+##########################
+#CUDA_VISIBLE_DEVICES=0 python train.py --merge=True --gaussian_noise=True --discrim=True --denoise_discrim=False --average_filter=False --denoise=False --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --preprocessing_checkpoint=preprocess_checkpoints/gaussian_denoise_discrim/model.ckpt-23170 --train_dir=checkpoints/faster_rcnn_inception_v2_coco_train_discrim_ref
+
+
+#CUDA_VISIBLE_DEVICES=0 python train.py --gaussian_noise=True --lowres=True --discrim=True --average_filter=True --denoise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_avgfilter_discrim.config --entire_finetune=True --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_noddiscrim_discrim_entirefinetune
+#CUDA_VISIBLE_DEVICES=0 python train.py --gaussian_noise=True --lowres=True --discrim=True --average_filter=True --denoise=True --denoise_discrim=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k_gaussian_avgfilter_discrim.config --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussian_hrlr_avgfilter_denoise_discrim
+
+
+#CUDA_VISIBLE_DEVICES=1 python train.py --merge=True --gaussian_noise=True --discrim=True --denoise_discrim=False --average_filter=True --denoise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --preprocessing_checkpoint=checkpoints/gaussiansigma0p15_avgfilter_denoise_discrim/model.ckpt-40000 --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussiansigma0p15_avgfilter_denoise_discrim_noddiscrim_ref
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussiansigma0p15_avgfilter_denoise_discrim_noddiscrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussiansigma0p15_hrlr_avgfilter_denoise_noddiscrim_discrim/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussiansigma0p15_avgfilter_denoise_discrim_noddiscrim_ref/checkpoint          checkpoints/faster_rcnn_inception_v2_coco_gaussiansigma0p15_hrlr_avgfilter_denoise_noddiscrim_discrim/.
+#CUDA_VISIBLE_DEVICES=1 python train.py --merge=True --gaussian_noise=True --discrim=True --denoise_discrim=True --average_filter=True --denoise=True --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --preprocessing_checkpoint=checkpoints/gaussiansigma0p15_avgfilter_denoise_discrim/model.ckpt-40000 --train_dir=checkpoints/faster_rcnn_inception_v2_coco_gaussiansigma0p15_avgfilter_denoise_discrim_ref
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussiansigma0p15_avgfilter_denoise_discrim_ref/model.ckpt-600000.* checkpoints/faster_rcnn_inception_v2_coco_gaussiansigma0p15_hrlr_avgfilter_denoise_noddiscrim_discrim/.
+#cp checkpoints/faster_rcnn_inception_v2_coco_gaussiansigma0p15_avgfilter_denoise_discrim_ref/checkpoint          checkpoints/faster_rcnn_inception_v2_coco_gaussiansigma0p15_hrlr_avgfilter_denoise_noddiscrim_discrim/.
+
+
+
+

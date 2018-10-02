@@ -90,3 +90,22 @@ ENV/
 
 # PyCharm
 .idea/
+
+# Checkpoints
+research/object_detection/checkpoints/*
+*events.out*
+*.ckpt-*
+*.png
+*.jpg
+*.tar
+*.gz
+*.zip
+*_pb2.py
+
+# Frozen Graphs
+*.pb
+research/pycocotools/*
+research/object_detection/inference_graph/*
+research/object_detection/data/*
+research/object_detection/preprocess_checkpoints/
+research/object_detection/evals/*

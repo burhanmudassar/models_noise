@@ -1,0 +1,12 @@
+
+#CUDA_VISIBLE_DEVICES='' python eval.py --logtostderr --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_base_600k.config --checkpoint_dir=checkpoints/faster_rcnn_inception_v2_coco_pivot1e-4_train --eval_dir=evals/faster_rcnn_inception_v2_coco_pivot1e-4_eval
+#CUDA_VISIBLE_DEVICES='' python eval.py --logtostderr --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_base_600k.config --checkpoint_dir=checkpoints/faster_rcnn_inception_v2_coco_base_train --eval_dir=evals/faster_rcnn_inception_v2_coco_base_eval
+#CUDA_VISIBLE_DEVICES='' python eval.py --logtostderr --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_base_600k.config --checkpoint_dir=checkpoints/faster_rcnn_inception_v2_coco_hrlr_train --eval_dir=evals/faster_rcnn_inception_v2_coco_hrlr_eval
+
+#CUDA_VISIBLE_DEVICES=1 python eval.py --lowres=True --subsample_factor=4 --resize_method=0 --logtostderr --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_base_600k.config --checkpoint_dir=checkpoints/faster_rcnn_inception_v2_coco_pivot1e-4_train --eval_dir=evals/faster_rcnn_inception_v2_coco_pivot1e-4_lowres_eval
+#CUDA_VISIBLE_DEVICES=1 python eval.py --lowres=True --subsample_factor=4 --resize_method=0 --logtostderr --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_base_600k.config --checkpoint_dir=checkpoints/faster_rcnn_inception_v2_coco_hrlr_train --eval_dir=evals/faster_rcnn_inception_v2_coco_hrlr_lowres_eval
+#CUDA_VISIBLE_DEVICES='' python eval.py --lowres=True --subsample_factor=4 --resize_method=0 --logtostderr --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_base_600k.config --checkpoint_dir=checkpoints/faster_rcnn_inception_v2_coco_base_train --eval_dir=evals/faster_rcnn_inception_v2_coco_base_lowres_eval
+
+#CUDA_VISIBLE_DEVICES=0 python eval.py --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_400k.config --checkpoint_dir=checkpoints/faster_rcnn_inception_v2_coco_train --eval_dir=evals/faster_rcnn_inception_v2_coco_eval
+CUDA_VISIBLE_DEVICES='' python eval.py --pipeline_config_path=samples/configs/faster_rcnn_inception_v2_coco_600k.config --checkpoint_dir=checkpoints/faster_rcnn_inception_v2_coco_train --eval_dir=evals/faster_rcnn_inception_v2_coco_eval
+

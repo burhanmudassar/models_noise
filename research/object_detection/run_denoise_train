@@ -1,0 +1,2 @@
+
+CUDA_VISIBLE_DEVICES=1 python denoise_train.py --gaussian_noise=True --denoise=True --average_filter=False --pipeline_config_path=samples/configs/gaussian_denoise.config --train_dir=checkpoints/gaussian_denoise

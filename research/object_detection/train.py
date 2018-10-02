@@ -80,6 +80,78 @@ flags.DEFINE_string('input_config_path', '',
 flags.DEFINE_string('model_config_path', '',
                     'Path to a model_pb2.DetectionModel config file.')
 
+flags.DEFINE_boolean('frcnn_only_training', False,
+                     'True if you want to only train Faster RCNN.')
+flags.DEFINE_boolean('entire_finetune', False,
+                     'True if you want to only train Faster RCNN.')
+flags.DEFINE_boolean('merge', False,
+                     'True for merging checkpoints (Faster RCNN and input preprocessing).')
+flags.DEFINE_string('preprocessing_checkpoint', '',
+                    'Directory to save the checkpoints and training summaries.')
+flags.DEFINE_string('preprocessing_checkpoint2', '',
+                    'Directory to save the checkpoints and training summaries.')
+
+flags.DEFINE_boolean('discrim', False,
+                     'True for enabling discriminator network.')
+flags.DEFINE_float('discrim_loss_factor', 1.,
+                   'discrim loss factor [ 0.0001]')
+
+flags.DEFINE_integer('res_depth', 0, 'Depth of the residual block for the generator')
+flags.DEFINE_boolean('resize', False,
+                    'True for resizing the image.')
+flags.DEFINE_boolean('denoise', False,
+                    'True for denoise.')
+flags.DEFINE_float('denoise_loss_factor', 0.001,
+                   'denoise loss factor [ 0.0001]')
+
+flags.DEFINE_boolean('denoise_discrim', False,
+                     'True for enabling discriminator network.')
+flags.DEFINE_float('denoise_gan_loss_factor', 1.,
+                   'discrim loss factor [ 0.01]')
+flags.DEFINE_integer('ks', 3,
+                     'size of the convolutional filter')
+flags.DEFINE_integer('ngf', 16,
+                     '# of gen filters in first conv layer')
+flags.DEFINE_integer('ndf', 16,
+                     '# of discrim filters in first conv layer')
+
+flags.DEFINE_string('similarity_loss', 'bidirection',
+#flags.DEFINE_string('similarity_loss', 'pivot',
+                    'Choose between pivot and bidirection.')
+flags.DEFINE_float('similarity_loss_factor', 0.0,
+                   'similarity loss factor [ 0.0001]')
+flags.DEFINE_float('second_stage_similarity_loss_factor', 0.0,
+                   'second stage similarity loss factor [ 0.0001]')
+
+flags.DEFINE_boolean('additive_noise', False,
+                     'True for adding noise additively.')
+flags.DEFINE_boolean('lowres', False,
+                     'True for low + high resolution training.')
+flags.DEFINE_integer('subsample_factor', 4, 'Subsampling factor ')
+flags.DEFINE_boolean('generator_separate_channel', False,
+                    'True for channel wise learning.')
+flags.DEFINE_boolean('rand_stddev', True,
+                    'True for random std deviation for noisy images.')
+flags.DEFINE_float('stddev', 0.15,
+                   'stddev for gaussian noise assuming pixels are'
+                   'in range [0, 1)')
+flags.DEFINE_float('ratio', 0.1,
+                   'ratio for salt_pepper noise')
+flags.DEFINE_integer('filter_size', 3,
+                   'filter size for median filter or average filter')
+flags.DEFINE_boolean('median_filter', False,
+                     'True for median filter use.')
+flags.DEFINE_boolean('average_filter', False,
+                     'True for average filter use.')
+flags.DEFINE_boolean('mixture_of_filters', False,
+                     'True for mixture of filters.')
+flags.DEFINE_boolean('salt_pepper_noise', False,
+                     'True for original + salt_pepper noise training/evaluation.')
+flags.DEFINE_boolean('gaussian_noise', False,
+                     'True for original + gaussian noise training.')
+flags.DEFINE_boolean('snow', False,
+                     'True for original + snow effect training.')
+
 FLAGS = flags.FLAGS
 
 

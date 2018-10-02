@@ -41,13 +41,16 @@ def write_metrics(metrics, global_step, summary_dir):
   """
   logging.info('Writing metrics to tf summary.')
   summary_writer = tf.summary.FileWriter(summary_dir)
+  sfile = open(summary_dir + '/metrics_summary.txt', 'w')
   for key in sorted(metrics):
     summary = tf.Summary(value=[
         tf.Summary.Value(tag=key, simple_value=metrics[key]),
     ])
     summary_writer.add_summary(summary, global_step)
     logging.info('%s: %f', key, metrics[key])
+    sfile.write('%s: %f\n' % (key, metrics[key]))
   summary_writer.close()
+  sfile.close()
   logging.info('Metrics written to tf summary.')
 
 
@@ -118,18 +121,31 @@ def visualize_detection_results(result_dict,
   category_index = label_map_util.create_category_index(categories)
 
   image = np.squeeze(result_dict['original_image'], axis=0)
+  prefiltered_image = np.squeeze(result_dict['prefiltered_image'], axis=0)
+  filtered_image = np.squeeze(result_dict['filtered_image'], axis=0)
+  preprocessed_image = np.squeeze(result_dict['image'], axis=0)
   detection_boxes = result_dict['detection_boxes']
   detection_scores = result_dict['detection_scores']
   detection_classes = np.int32((result_dict['detection_classes']))
   detection_keypoints = result_dict.get('detection_keypoints', None)
   detection_masks = result_dict.get('detection_masks', None)
 
+  if export_dir:
+    export_path = os.path.join(export_dir, '{}-original.png'.format(tag))
+    vis_utils.save_image_array_as_png(image, export_path)
+    export_path = os.path.join(export_dir, '{}-filtered.png'.format(tag))
+    vis_utils.save_image_array_as_png(filtered_image, export_path)
+    export_path = os.path.join(export_dir, '{}-prefiltered.png'.format(tag))
+    vis_utils.save_image_array_as_png(prefiltered_image, export_path)
+    export_path = os.path.join(export_dir, '{}-preprocessed.png'.format(tag))
+    vis_utils.save_image_array_as_png(preprocessed_image, export_path)
+
   # Plot groundtruth underneath detections
   if show_groundtruth:
     groundtruth_boxes = result_dict['groundtruth_boxes']
     groundtruth_keypoints = result_dict.get('groundtruth_keypoints', None)
     vis_utils.visualize_boxes_and_labels_on_image_array(
-        image,
+        preprocessed_image,
         groundtruth_boxes,
         None,
         None,
@@ -138,7 +154,7 @@ def visualize_detection_results(result_dict,
         use_normalized_coordinates=False,
         max_boxes_to_draw=None)
   vis_utils.visualize_boxes_and_labels_on_image_array(
-      image,
+      preprocessed_image,
       detection_boxes,
       detection_classes,
       detection_scores,
@@ -151,15 +167,30 @@ def visualize_detection_results(result_dict,
       agnostic_mode=agnostic_mode)
 
   if export_dir:
-    export_path = os.path.join(export_dir, 'export-{}.png'.format(tag))
-    vis_utils.save_image_array_as_png(image, export_path)
+    export_path = os.path.join(export_dir, '{}-final-detection.png'.format(tag))
+    vis_utils.save_image_array_as_png(preprocessed_image, export_path)
 
   summary = tf.Summary(value=[
       tf.Summary.Value(
           tag=tag,
           image=tf.Summary.Image(
               encoded_image_string=vis_utils.encode_image_array_as_png_str(
-                  image)))
+                  image))),
+      tf.Summary.Value(
+          tag=tag,
+          image=tf.Summary.Image(
+              encoded_image_string=vis_utils.encode_image_array_as_png_str(
+                  prefiltered_image))),
+      tf.Summary.Value(
+          tag=tag,
+          image=tf.Summary.Image(
+              encoded_image_string=vis_utils.encode_image_array_as_png_str(
+                  filtered_image))),
+      tf.Summary.Value(
+          tag=tag,
+          image=tf.Summary.Image(
+              encoded_image_string=vis_utils.encode_image_array_as_png_str(
+                  preprocessed_image)))
   ])
   summary_writer = tf.summary.FileWriter(summary_dir)
   summary_writer.add_summary(summary, global_step)
@@ -382,6 +413,16 @@ def repeated_checkpoint_run(tensor_dict,
       write_metrics(metrics, global_step, summary_dir)
     number_of_evaluations += 1
 
+    for key, value in sorted(metrics.iteritems()):
+      if 'PerformanceByCategory' in key:
+        print key, value
+    mAP_list = []
+    for key, value in sorted(metrics.iteritems()):
+      if 'mAP' in key:
+        print key, value
+        mAP_list.append(value)
+    print 'average mAP: ', sum(mAP_list)/len(mAP_list)
+
     if (max_number_of_evaluations and
         number_of_evaluations >= max_number_of_evaluations):
       logging.info('Finished evaluation!')
@@ -394,6 +435,9 @@ def repeated_checkpoint_run(tensor_dict,
 
 
 def result_dict_for_single_example(image,
+                                   prefiltered_image,
+                                   filtered_image,
+                                   preprocessed_image,
                                    key,
                                    detections,
                                    groundtruth=None,
@@ -456,13 +500,16 @@ def result_dict_for_single_example(image,
   input_data_fields = fields.InputDataFields()
   output_dict = {
       input_data_fields.original_image: image,
+      'prefiltered_image': prefiltered_image,
+      'filtered_image': filtered_image,
+      input_data_fields.image: preprocessed_image,
       input_data_fields.key: key,
   }
 
   detection_fields = fields.DetectionResultFields
   detection_boxes = detections[detection_fields.detection_boxes][0]
   output_dict[detection_fields.detection_boxes] = detection_boxes
-  image_shape = tf.shape(image)
+  image_shape = tf.shape(preprocessed_image)
   if scale_to_absolute:
     absolute_detection_boxlist = box_list_ops.to_absolute_coordinates(
         box_list.BoxList(detection_boxes), image_shape[1], image_shape[2])

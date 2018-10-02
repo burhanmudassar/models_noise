@@ -1,0 +1,3 @@
+
+#CUDA_VISIBLE_DEVICES=1 python discrim_train.py --gaussian_noise=True --discrim=True --average_filter=True --pipeline_config_path=samples/configs/gaussian_discrim.config --train_dir=checkpoints/gaussian_discrim
+CUDA_VISIBLE_DEVICES=1 python discrim_train.py --gaussian_noise=True --discrim=True --average_filter=True --pipeline_config_path=samples/configs/gaussian_discrim.config --train_dir=checkpoints/gaussian_discrim

@@ -275,6 +275,17 @@ class PascalDetectionEvaluator(ObjectDetectionEvaluator):
         metric_prefix='PASCAL',
         use_weighted_mean_ap=False)
 
+class Pascal75DetectionEvaluator(ObjectDetectionEvaluator):
+  """A class to evaluate detections using PASCAL metrics."""
+
+  def __init__(self, categories, matching_iou_threshold=0.75):
+    super(PascalDetectionEvaluator, self).__init__(
+        categories,
+        matching_iou_threshold=matching_iou_threshold,
+        evaluate_corlocs=False,
+        metric_prefix='PASCAL75',
+        use_weighted_mean_ap=False)
+
 
 class WeightedPascalDetectionEvaluator(ObjectDetectionEvaluator):
   """A class to evaluate detections using weighted PASCAL metrics.
@@ -580,6 +591,8 @@ class ObjectDetectionEvaluation(object):
       all_scores = np.array([], dtype=float)
       all_tp_fp_labels = np.array([], dtype=bool)
 
+    num_class = 0
+    mean_average_precision = 0.
     for class_index in range(self.num_class):
       if self.num_gt_instances_per_class[class_index] == 0:
         continue
@@ -598,6 +611,12 @@ class ObjectDetectionEvaluation(object):
       self.recalls_per_class.append(recall)
       average_precision = metrics.compute_average_precision(precision, recall)
       self.average_precision_per_class[class_index] = average_precision
+      mean_average_precision += average_precision
+      num_class += 1
+#      print('Class %d average precision: %f' % (class_index, average_precision))
+
+    mean_average_precision /= num_class
+#    print('Mean average precision: %f' % mean_average_precision)
 
     self.corloc_per_class = metrics.compute_cor_loc(
         self.num_gt_imgs_per_class,

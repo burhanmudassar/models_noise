@@ -28,6 +28,7 @@ from tensorflow.python.training import saver as saver_lib
 from object_detection.builders import model_builder
 from object_detection.core import standard_fields as fields
 from object_detection.data_decoders import tf_example_decoder
+from object_detection.denoise import gated_denoise
 
 slim = tf.contrib.slim
 
@@ -68,8 +69,9 @@ def freeze_graph_with_def_protos(
 
     if optimize_graph:
       logging.info('Graph Rewriter optimizations enabled')
-      rewrite_options = rewriter_config_pb2.RewriterConfig(
-          optimize_tensor_layout=True)
+      rewrite_options = rewriter_config_pb2.RewriterConfig()
+#      rewrite_options = rewriter_config_pb2.RewriterConfig(
+#          optimize_tensor_layout=True)
       rewrite_options.optimizers.append('pruning')
       rewrite_options.optimizers.append('constfold')
       rewrite_options.optimizers.append('layout')
@@ -320,12 +322,22 @@ def _write_graph_and_checkpoint(inference_graph_def,
       saver.restore(sess, trained_checkpoint_prefix)
       saver.save(sess, model_path)
 
+def inception_preprocess(images):
+  """ [0, 255] --> [-1, 1]
+  """
+  return (2.0 / 255.0) * images - 1.0 
+
+def inception_depreprocess(images):
+  """ [-1, 1] --> [0, 255]
+  """
+  return (255.0 / 2.0) * (images + 1.0)
 
 def _export_inference_graph(input_type,
                             detection_model,
                             use_moving_averages,
                             trained_checkpoint_prefix,
                             output_directory,
+                            FLAGS,
                             additional_output_tensor_names=None,
                             input_shape=None,
                             optimize_graph=True,
@@ -348,8 +360,13 @@ def _export_inference_graph(input_type,
   placeholder_tensor, input_tensors = input_placeholder_fn_map[input_type](
       **placeholder_args)
   inputs = tf.to_float(input_tensors)
-  preprocessed_inputs = detection_model.preprocess(inputs)
-  output_tensors = detection_model.predict(preprocessed_inputs)
+  preprocessed_inputs = inception_preprocess(inputs)
+  denoised_inputs = preprocessed_inputs
+  denoised_inputs, losses_dict, summaries_dict = gated_denoise(preprocessed_inputs, FLAGS) 
+
+  denoised_inputs = inception_depreprocess(denoised_inputs)
+  denoised_inputs = detection_model.preprocess(denoised_inputs)
+  output_tensors = detection_model.predict(denoised_inputs)
   postprocessed_tensors = detection_model.postprocess(output_tensors)
   outputs = _add_output_tensor_nodes(postprocessed_tensors,
                                      output_collection_name)
@@ -398,6 +415,7 @@ def export_inference_graph(input_type,
                            pipeline_config,
                            trained_checkpoint_prefix,
                            output_directory,
+                           FLAGS,
                            input_shape=None,
                            optimize_graph=True,
                            output_collection_name='inference_op',
@@ -423,5 +441,7 @@ def export_inference_graph(input_type,
   _export_inference_graph(input_type, detection_model,
                           pipeline_config.eval_config.use_moving_averages,
                           trained_checkpoint_prefix,
-                          output_directory, additional_output_tensor_names,
+                          output_directory,
+                          FLAGS,
+                          additional_output_tensor_names,
                           input_shape, optimize_graph, output_collection_name)

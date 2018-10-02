@@ -31,8 +31,51 @@ from object_detection.core import standard_fields as fields
 from object_detection.utils import ops as util_ops
 from object_detection.utils import variables_helper
 from deployment import model_deploy
+#from denoise import discrim, discrim_loss
+from collections import namedtuple
+from module import *
+import re
+import time
+TOWER_NAME = 'tower'
 
 slim = tf.contrib.slim
+
+flags = tf.app.flags
+FLAGS = flags.FLAGS
+
+def activation_summary(x):
+  """Helper to create summaries for activations.
+
+  Creates a summary that provides a histogram of activations.
+  Creates a summary that measures the sparsity of activations.
+
+  Args:
+    x: Tensor
+  Returns:
+    nothing
+  """
+  # Remove 'tower_[0-9]/' from the name in case this is a multi-GPU training
+  # session. This helps the clarity of presentation on tensorboard.
+  tensor_name = re.sub('%s_[0-9]*/' % TOWER_NAME, '', x.op.name)
+  tf.summary.histogram(tensor_name + '/activations', x)
+  tf.summary.scalar(tensor_name + '/sparsity',
+                                       tf.nn.zero_fraction(x))
+
+def optimistic_restore(session, save_file):
+  reader = tf.train.NewCheckpointReader(save_file)
+  saved_shapes = reader.get_variable_to_shape_map()
+  var_names = sorted([(var.name, var.name.split(':')[0]) for var in tf.global_variables()
+                  if var.name.split(':')[0] in saved_shapes])
+  restore_vars = []
+  name2var = dict(zip(map(lambda x:x.name.split(':')[0], tf.global_variables()), tf.global_variables()))
+  with tf.variable_scope('', reuse=True):
+    for var_name, saved_var_name in var_names:
+      curr_var = name2var[saved_var_name]
+      var_shape = curr_var.get_shape().as_list()
+      if var_shape == saved_shapes[saved_var_name]:
+        restore_vars.append(curr_var)
+  saver = tf.train.Saver(restore_vars)
+  saver.restore(session, save_file)
 
 
 def create_input_queue(batch_size_per_clone, create_tensor_dict_fn,
@@ -136,6 +179,254 @@ def get_inputs(input_queue, num_classes, merge_multiple_label_boxes=False):
 
   return zip(*map(extract_images_and_targets, read_data_list))
 
+def get_salt_pepper_noise_image(image, ratio=0.01, rand_ratio=False):
+
+  image_shape = tf.shape(image)
+  num_batch = image_shape[0]
+  height = image_shape[1]
+  width = image_shape[2]
+
+  # uniform [1 - ratio, 2 - ratio)
+  ratio = tf.random_uniform([], maxval=ratio) if rand_ratio else ratio
+  random_tensor = 1. - ratio
+  random_tensor += tf.random_uniform(image_shape)
+  # 0: ratio, 1: 1 - ratio
+  binary_tensor = tf.floor(random_tensor)
+
+  # scale image from [-1, 1] to [0, 1]
+  random_tensor2 = tf.random_uniform(image_shape)
+  image = (image + 1.)/2.
+  noise_image = binary_tensor*image + (1.-binary_tensor)*random_tensor2
+
+  # scaling pixel values to be in [-1, 1]).
+  noise_image = tf.clip_by_value(noise_image*2.-1, -1, 1)
+  return noise_image
+
+def get_gaussian_noise_image(image, stddev=0.15, rand_stddev=False):
+
+  image_shape = tf.shape(image)
+  num_batch = image_shape[0]
+  height = image_shape[1]
+  width = image_shape[2]
+  
+  if rand_stddev:
+    sigma = tf.abs(tf.truncated_normal([num_batch], mean=0., stddev=stddev/2))
+  else:
+    sigma = stddev
+  # since preprocessed input values are in [-1, 1], we use sigma*2
+  noise = tf.random_normal(image_shape, mean=0., stddev=sigma*2)
+  # scaling pixel values to be in [-1, 1]).
+  noise_image = tf.clip_by_value(image + noise, -1, 1)
+  return noise_image
+
+def get_snow_image(image, sparsity=0.05):
+  # image shape: [1, None, None, 3]
+
+  image_shape = image.get_shape().as_list()
+  height = image_shape[1]
+  width = image_shape[2]
+  
+  # assume the size of the snow ball is 24.
+  #    **
+  #   ****
+  #  ******
+  #  ******
+  #   ****
+  #    **
+  # based on sparsity we calculate the number of snow balls in a image
+  num_snows = int(height*width*sparsity/24)
+  
+  snow_rows = tf.random_uniform([num_snows], 0, height, dtype=tf.int32)
+  snow_cols = tf.random_uniform([num_snows], 0, width, dtype=tf.int32)
+
+def resize_dividable_image(image, number):
+  # image shape: [1, None, None, 3]
+
+  image_shape = tf.shape(image)
+  height = image_shape[1]/number*number
+  width = image_shape[2]/number*number
+  return tf.image.resize_images(image, [height, width])
+  
+
+def get_lowres_image(image, subsample_factor=4):
+  # image shape: [1, None, None, 3]
+
+  image_shape = tf.shape(image)
+  height = image_shape[1]
+  width = image_shape[2]
+
+  # randomly select subsample factor to be 2 or 4
+  subsample = tf.floor(tf.random_uniform([], 0, 2))
+  s1 = subsample_factor/2
+  s2 = subsample_factor
+  down_height, down_width = tf.cond(tf.equal(subsample, 1),
+                              lambda: (tf.to_int32(height/s1), tf.to_int32(width/s1)),
+                              lambda: (tf.to_int32(height/s2), tf.to_int32(width/s2)))
+  downsampled_image = tf.image.resize_images(image,
+                                        [down_height, down_width])
+
+  # randomly select resize methods
+  resize_method = tf.to_int32(tf.floor(tf.random_uniform([], 0, 4)))
+
+  upsampled_image0 = tf.image.resize_images(downsampled_image,
+                                           [height, width], method=0)
+  upsampled_image1 = tf.image.resize_images(downsampled_image,
+                                           [height, width], method=1)
+  upsampled_image2 = tf.image.resize_images(downsampled_image,
+                                           [height, width], method=2)
+  upsampled_image3 = tf.image.resize_images(downsampled_image,
+                                           [height, width], method=3)
+  upsampled_image = tf.case({tf.equal(resize_method, 0): lambda: upsampled_image0,
+                             tf.equal(resize_method, 1): lambda: upsampled_image1,
+                             tf.equal(resize_method, 2): lambda: upsampled_image2,
+                            }, default=lambda: upsampled_image3)
+  return upsampled_image
+
+def add_noise(images,
+              salt_pepper_noise=False,
+              gaussian_noise=False,
+              lowres=False,
+              snow=False):
+  """Creates loss function for a DetectionModel.
+
+  Args:
+    images: list of image tensors.
+    FLAGS: tf.app.flags.FLAGS
+  """
+  # After model's preprocess is done,
+  # we double the size of the input mini batch for similarity learning
+  noisy_images = images
+  if salt_pepper_noise:
+    noisy_images = [get_salt_pepper_noise_image(image, ratio=FLAGS.ratio, rand_ratio=True)
+                    for image in noisy_images]
+    tf.summary.image('salt_pepper_noise_images', noisy_images[0])
+  if gaussian_noise:
+    noisy_images = [get_gaussian_noise_image(image, FLAGS.stddev, rand_stddev=FLAGS.rand_stddev)
+                    for image in noisy_images]
+    tf.summary.image('gaussian_noise_images', noisy_images[0])
+  if lowres:
+    noisy_images = [get_lowres_image(image, FLAGS.subsample_factor) for image in noisy_images]
+    tf.summary.image('mixed_resolution_images', noisy_images[0])
+  if snow:
+    noisy_images = [get_snow_image(image) for image
+                   in noisy_images]
+    tf.summary.image('snow_images', noisy_images[0])
+
+  return noisy_images
+
+def gated_denoise(images, is_training, batch_size):
+  # Discriminator Network
+  # We are just mixing the two images
+  images_shape = images.get_shape().as_list()
+  noisy_batch_size = batch_size if (FLAGS.lowres or FLAGS.gaussian_noise) else 0
+  losses_dict = {}
+  summaries_dict = {}
+
+  OPTIONS = namedtuple('OPTIONS', 'gf_dim df_dim output_c_dim is_training')
+  options = OPTIONS._make((FLAGS.ngf, FLAGS.ndf, 3, is_training))
+  criterionGAN = mae_criterion
+  criterionGAN2 = sce_criterion
+  
+  noisy_images = images[:noisy_batch_size]
+  original_images = images[noisy_batch_size:]
+
+  # Filter
+  summaries_dict['prefiltered_noisy_images'] = tf.summary.image('prefiltered_noisy_images', images, max_outputs=1)
+  summaries_dict['prefiltered_clean_images'] = tf.summary.image('prefiltered_clean_images', images[noisy_batch_size:], max_outputs=1)
+  filtered_images = images
+  if FLAGS.average_filter:
+    if FLAGS.mixture_of_filters:
+      with tf.variable_scope('filter_gate') as scope:
+        print('Building mixture of filters model')
+        filtered_images0 = average_filter(images, 2)
+        filtered_images1 = average_filter(images, 3)
+        filtered_images2 = average_filter(images, 4)
+        probs = gate(images, FLAGS.ndf, num_classes=4, reuse=False, name='gate')
+        activation_summary(probs)
+        filtered_images = tf.add_n([probs[:,0,None,None,None]*images,
+                                    probs[:,1,None,None,None]*filtered_images0,
+                                    probs[:,2,None,None,None]*filtered_images1,
+                                    probs[:,3,None,None,None]*filtered_images2])
+    else:
+      filtered_images = average_filter(images, FLAGS.filter_size)
+    summaries_dict['filtered_noisy_images'] = tf.summary.image('filtered_noisy_images', filtered_images, max_outputs=1)
+    summaries_dict['filtered_clean_images'] = tf.summary.image('filtered_clean_images', filtered_images[noisy_batch_size:], max_outputs=1)
+
+  if FLAGS.denoise:
+    with tf.variable_scope('denoise') as scope:
+      if FLAGS.generator_separate_channel:
+        denoised_images = generator_separate_resnet(filtered_images, options, res_depth=FLAGS.res_depth, reuse=False, name='generator') 
+      else:
+        denoised_images = generator_resnet(filtered_images, options, res_depth=FLAGS.res_depth, output_c_dim=3, reuse=False, name='generator') 
+      denoise_sim_loss = abs_criterion(denoised_images[:noisy_batch_size], original_images, name='g_loss/sim_loss')
+      g_loss = FLAGS.denoise_loss_factor * denoise_sim_loss
+      losses_dict['g_loss'] = g_loss
+      summaries_dict['g_loss/sim_loss'] = tf.summary.scalar('g_loss/sim_loss', denoise_sim_loss)
+      if FLAGS.denoise_discrim:
+        noisy_and_denoised = tf.concat([noisy_images, denoised_images[:noisy_batch_size]], 3)
+        noisy_and_original = tf.concat([noisy_images, original_images], 3)
+#        d_denoised = discriminator(noisy_and_denoised, FLAGS.ndf, FLAGS.ks, reuse=False, name='discriminator')
+#        d_original = discriminator(noisy_and_original, FLAGS.ndf, FLAGS.ks, reuse=True,  name='discriminator')
+        d_denoised = discriminator(denoised_images[:noisy_batch_size], FLAGS.ndf, FLAGS.ks, reuse=False, name='discriminator')
+        d_original = discriminator(original_images, FLAGS.ndf, FLAGS.ks, reuse=True,  name='discriminator')
+
+        # generator loss
+        g_gan_loss = criterionGAN(d_denoised, tf.ones_like(d_denoised))
+        summaries_dict['g_gan_loss'] = tf.summary.scalar('g_loss/g_gan_loss', g_gan_loss)
+
+        g_loss += FLAGS.denoise_gan_loss_factor * g_gan_loss
+        losses_dict['g_loss'] = g_loss
+
+        # discriminator loss
+        d_loss_real = criterionGAN(d_original, tf.ones_like(d_original))
+        d_loss_fake = criterionGAN(d_denoised, tf.zeros_like(d_denoised))
+
+        d_loss = FLAGS.denoise_gan_loss_factor * (d_loss_real + d_loss_fake) / 2 
+        losses_dict['d_loss'] = d_loss
+
+        summaries_dict['d_loss'] = tf.summary.scalar('d_loss', d_loss)
+
+      summaries_dict['g_loss'] = tf.summary.scalar('g_loss', g_loss)
+  
+    filtered_images = denoised_images
+    summaries_dict['denoised_noisy_images'] = tf.summary.image('denoised_noisy_images', filtered_images, max_outputs=1)
+    summaries_dict['denoised_clean_images'] = tf.summary.image('denoised_clean_images', filtered_images[noisy_batch_size:], max_outputs=1)
+
+  # Gate Operation
+  if FLAGS.discrim:
+    with tf.variable_scope('input_discrim') as scope:
+      d_in_logits = discriminator(images, FLAGS.ndf, FLAGS.ks, reuse=False, name='discriminator')
+
+      d_in_loss_real = criterionGAN2(d_in_logits[noisy_batch_size:],  tf.ones_like(d_in_logits[noisy_batch_size:]))
+      d_in_loss_fake = criterionGAN2(d_in_logits[:noisy_batch_size], tf.zeros_like(d_in_logits[:noisy_batch_size]))
+
+      d_in_loss = FLAGS.discrim_loss_factor * (d_in_loss_real + d_in_loss_fake) / 2 
+      losses_dict['d_in_loss'] = d_in_loss
+      summaries_dict['d_in_loss'] = tf.summary.scalar('d_in_loss', d_in_loss)
+      #tf.add_to_collection('losses', losses_dict['d_in_loss'])
+  
+      d_in_logits = tf.reduce_mean(d_in_logits, [1, 2, 3])
+      d_in_sigmoid = tf.nn.sigmoid(d_in_logits, name='is_clean')
+      activation_summary(d_in_sigmoid)
+      images =  tf.add(d_in_sigmoid[:,None,None,None] * images,
+                       (1 - d_in_sigmoid[:,None,None,None]) * filtered_images)
+  else:
+    images = filtered_images
+
+  summaries_dict['preprocessed_noisy_images'] = tf.summary.image('preprocessed_noisy_images', images, max_outputs=1)
+  summaries_dict['preprocessed_clean_images'] = tf.summary.image('preprocessed_clean_images', images[noisy_batch_size:], max_outputs=1)
+
+  return images, losses_dict, summaries_dict
+
+def inception_preprocess(images):
+  """ [0, 255] --> [-1, 1]
+  """
+  return (2.0 / 255.0) * images - 1.0
+
+def inception_depreprocess(images):
+  """ [-1, 1] --> [0, 255]
+  """
+  return (255.0 / 2.0) * (images + 1.0)
 
 def _create_losses(input_queue, create_model_fn, train_config):
   """Creates loss function for a DetectionModel.
@@ -151,8 +442,81 @@ def _create_losses(input_queue, create_model_fn, train_config):
        input_queue,
        detection_model.num_classes,
        train_config.merge_multiple_label_boxes)
-  images = [detection_model.preprocess(image) for image in images]
+#  images = [detection_model.preprocess(image) for image in images]
+  images = [inception_preprocess(image) for image in images]
+
+  # lowresolution injection
+  tf.summary.image('preprocessed_images', images[0])
+
+  # images[0] shape: (1, ?, ?, 3)
+  # groundtruth_boxes_list shape: (?, 4)
+  image_with_box = tf.image.draw_bounding_boxes(images[0],
+                        tf.expand_dims(groundtruth_boxes_list[0], 0))
+  tf.summary.image('image_with_bounding_boxes', image_with_box)
+
+  noise = FLAGS.gaussian_noise or FLAGS.salt_pepper_noise
+  distort = FLAGS.lowres or FLAGS.snow
+  if noise or distort:
+    # add noise
+    noisy_images = add_noise(images,
+                             gaussian_noise=FLAGS.gaussian_noise,
+                             salt_pepper_noise=FLAGS.salt_pepper_noise)
+    if FLAGS.additive_noise:
+      noisy_images = add_noise(noisy_images,
+                               lowres=FLAGS.lowres,
+                               snow=FLAGS.snow)
+    else:
+      lowres_images = add_noise(images,
+                                lowres=FLAGS.lowres,
+                                snow=FLAGS.snow)
+    if noise is False:
+      noisy_images = lowres_images
+      print('low res images are now used for noisy images')
+    elif distort is True:
+      inject_clean_or_noise = tf.floor(tf.random_uniform([], 0, 100))
+      images = [tf.cond(tf.equal(inject_clean_or_noise, 0),
+                       lambda: image,
+                       lambda: lowres_image) for image, lowres_image in zip(images, lowres_images)]
+      
+    print('doubling input mini batch')
+    images = noisy_images + images
+    groundtruth_boxes_list += groundtruth_boxes_list
+    groundtruth_classes_list += groundtruth_classes_list
+    groundtruth_masks_list += groundtruth_masks_list
+
+    # make sure to match the size of the images for denoise filter training
+    # resize the images only when training denoise network.
+    if FLAGS.resize:
+      down_height = 600
+      down_width = 600
+      images = [tf.image.resize_images(image,
+                [down_height, down_width])
+                for image in images]
+      print('Performed Resizing')
+    else:
+      images = [resize_dividable_image(image, 4) for image in images]
+
+  # list of tensors --> tensors
   images = tf.concat(images, 0)
+
+  # Gated denoise
+  is_training_denoise_loss = not (FLAGS.frcnn_only_training or FLAGS.entire_finetune)
+  images, losses_dict, summaries_dict = gated_denoise(images, is_training_denoise_loss, train_config.batch_size)
+
+  if FLAGS.frcnn_only_training:
+    print('[Info]: Stop gradient has been applied between preprocessing and FRCNN.')
+    images = tf.stop_gradient(images)
+    losses_dict = {}
+  elif FLAGS.entire_finetune:
+    print('[Info]: Stop gradient has not been applied between preprocessing and FRCNN.')
+#    d_in_loss = losses_dict['d_in_loss']
+    losses_dict = {}
+#    losses_dict['d_in_loss'] = d_in_loss
+
+
+  images = inception_depreprocess(images)
+  images = detection_model.preprocess(images)
+
   if any(mask is None for mask in groundtruth_masks_list):
     groundtruth_masks_list = None
   if any(keypoints is None for keypoints in groundtruth_keypoints_list):
@@ -162,10 +526,16 @@ def _create_losses(input_queue, create_model_fn, train_config):
                                       groundtruth_classes_list,
                                       groundtruth_masks_list,
                                       groundtruth_keypoints_list)
-  prediction_dict = detection_model.predict(images)
 
-  losses_dict = detection_model.loss(prediction_dict)
-  for loss_tensor in losses_dict.values():
+  prediction_dict = {}
+  prediction_dict.update(detection_model.predict(images))
+
+  losses_dict.update(detection_model.loss(prediction_dict))
+  # added for debugging
+#  for loss_tensor, loss_key in zip(losses_dict.values(), losses_dict.keys()):
+  for loss_key, loss_tensor in losses_dict.items():
+    print(loss_key)
+    print(loss_tensor)
     tf.losses.add_loss(loss_tensor)
 
 
@@ -284,6 +654,9 @@ def train(create_tensor_dict_fn, create_model_fn, train_config, master, task,
       # Create gradient updates.
       grad_updates = training_optimizer.apply_gradients(grads_and_vars,
                                                         global_step=global_step)
+      print('Gradients and Variables\n')
+      for grads, vars in grads_and_vars:
+        print(grads, vars)
       update_ops.append(grad_updates)
 
       update_op = tf.group(*update_ops)
@@ -310,23 +683,36 @@ def train(create_tensor_dict_fn, create_model_fn, train_config, master, task,
     # Soft placement allows placing on CPU ops without GPU implementation.
     session_config = tf.ConfigProto(allow_soft_placement=True,
                                     log_device_placement=False)
+    session_config.gpu_options.allow_growth = True
 
     # Save checkpoints regularly.
     keep_checkpoint_every_n_hours = train_config.keep_checkpoint_every_n_hours
     saver = tf.train.Saver(
         keep_checkpoint_every_n_hours=keep_checkpoint_every_n_hours)
 
-    slim.learning.train(
-        train_tensor,
-        logdir=train_dir,
-        master=master,
-        is_chief=is_chief,
-        session_config=session_config,
-        startup_delay_steps=train_config.startup_delay_steps,
-        init_fn=init_fn,
-        summary_op=summary_op,
-        number_of_steps=(
-            train_config.num_steps if train_config.num_steps else None),
-        save_summaries_secs=120,
-        sync_optimizer=sync_optimizer,
-        saver=saver)
+
+    if FLAGS.merge:
+      with tf.Session(config=session_config) as sess:
+        sess.run(tf.global_variables_initializer())
+        optimistic_restore(sess, FLAGS.preprocessing_checkpoint)
+        if FLAGS.preprocessing_checkpoint2 != '':
+          optimistic_restore(sess, FLAGS.preprocessing_checkpoint2)
+          saver.save(sess, train_dir + '/model.ckpt-40000')
+        else:
+          optimistic_restore(sess, train_config.fine_tune_checkpoint)
+          saver.save(sess, train_dir + '/model.ckpt')
+    else:
+      slim.learning.train(
+          train_tensor,
+          logdir=train_dir,
+          master=master,
+          is_chief=is_chief,
+          session_config=session_config,
+          startup_delay_steps=train_config.startup_delay_steps,
+          init_fn=init_fn,
+          summary_op=summary_op,
+          number_of_steps=(
+              train_config.num_steps if train_config.num_steps else None),
+          save_summaries_secs=120,
+          sync_optimizer=sync_optimizer,
+          saver=saver)

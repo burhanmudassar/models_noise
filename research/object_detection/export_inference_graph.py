@@ -74,6 +74,38 @@ from object_detection.protos import pipeline_pb2
 slim = tf.contrib.slim
 flags = tf.app.flags
 
+flags.DEFINE_string('similarity_loss', 'bidirection',
+                    'Choose between pivot and bidirection.')
+flags.DEFINE_float('similarity_loss_factor', 0.0,
+                   'similarity loss factor [ 0.0001]')
+flags.DEFINE_float('second_stage_similarity_loss_factor', 0.0,
+                   'second stage similarity loss factor [ 0.0001]')
+
+flags.DEFINE_boolean('denoise', False,
+                    'True for denoise.')
+flags.DEFINE_float('denoise_loss_factor', 0.001,
+                   'denoise loss factor [ 0.0001]')
+flags.DEFINE_boolean('generator_separate_channel', False,
+                    'True for channel wise learning.')
+flags.DEFINE_boolean('denoise_discrim', False,
+                     'True for enabling discriminator network.')
+
+flags.DEFINE_boolean('average_filter', False,
+                     'True for average filter use.')
+flags.DEFINE_boolean('mixture_of_filters', False,
+                     'True for mixture of filters.')
+flags.DEFINE_boolean('discrim', False,
+                    'True for discrim.')
+flags.DEFINE_integer('res_depth', 0, 'Depth of the residual block for the generator')
+flags.DEFINE_integer('ngf', 16, 
+                     '# of gen filters in first conv layer')
+flags.DEFINE_integer('ndf', 16, 
+                     '# of discrim filters in first conv layer')
+flags.DEFINE_integer('filter_size', 3,
+                   'filter size for median filter or average filter')
+
+
+
 flags.DEFINE_string('input_type', 'image_tensor', 'Type of input node. Can be '
                     'one of [`image_tensor`, `encoded_image_string_tensor`, '
                     '`tf_example`]')
@@ -93,6 +125,9 @@ flags.DEFINE_string('trained_checkpoint_prefix', None,
                     'path/to/model.ckpt')
 flags.DEFINE_string('output_directory', None, 'Path to write outputs.')
 
+tf.app.flags.mark_flag_as_required('average_filter')
+tf.app.flags.mark_flag_as_required('denoise')
+tf.app.flags.mark_flag_as_required('discrim')
 tf.app.flags.mark_flag_as_required('pipeline_config_path')
 tf.app.flags.mark_flag_as_required('trained_checkpoint_prefix')
 tf.app.flags.mark_flag_as_required('output_directory')
@@ -112,7 +147,9 @@ def main(_):
     input_shape = None
   exporter.export_inference_graph(FLAGS.input_type, pipeline_config,
                                   FLAGS.trained_checkpoint_prefix,
-                                  FLAGS.output_directory, input_shape)
+                                  FLAGS.output_directory,
+                                  FLAGS,
+                                  input_shape)
 
 
 if __name__ == '__main__':

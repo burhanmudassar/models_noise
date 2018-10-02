@@ -62,7 +62,7 @@ flags.DEFINE_boolean('eval_training_data', False,
 flags.DEFINE_string('checkpoint_dir', '',
                     'Directory containing checkpoints to evaluate, typically '
                     'set to `train_dir` used in the training job.')
-flags.DEFINE_string('eval_dir', '',
+flags.DEFINE_string('eval_dir', '/tmp/faster_rcnn_inception_v2_coco',
                     'Directory to write eval summaries to.')
 flags.DEFINE_string('pipeline_config_path', '',
                     'Path to a pipeline_pb2.TrainEvalPipelineConfig config '
@@ -76,6 +76,52 @@ flags.DEFINE_string('model_config_path', '',
 flags.DEFINE_boolean('run_once', False, 'Option to only run a single pass of '
                      'evaluation. Overrides the `max_evals` parameter in the '
                      'provided config.')
+flags.DEFINE_string('similarity_loss', 'bidirection',
+                    'Choose between pivot and bidirection.')
+flags.DEFINE_integer('res_depth', 0, 'Depth of the residual block for the generator')
+flags.DEFINE_boolean('resize', False,
+                    'True for resizing the image.')
+flags.DEFINE_boolean('discrim', False,
+                    'True for discrim.')
+flags.DEFINE_boolean('denoise', False,
+                    'True for denoise.')
+flags.DEFINE_boolean('generator_separate_channel', False,
+                    'True for channel wise learning.')
+flags.DEFINE_boolean('denoise_discrim', False,
+                     'True for enabling discriminator network.')
+flags.DEFINE_integer('ks', 3,
+                     'size of the convolutional filter')
+flags.DEFINE_integer('ngf', 16,
+                     '# of gen filters in first conv layer')
+flags.DEFINE_integer('ndf', 16,
+                     '# of discrim filters in first conv layer')
+flags.DEFINE_float('stddev', 0.15,
+                   'stddev for gaussian noise assuming pixels are'
+                   'in range [0, 1)')
+flags.DEFINE_float('ratio', 0.01,
+                   'ratio for salt_pepper noise')
+flags.DEFINE_integer('filter_size', 3,
+                   'filter size for median filter or average filter')
+flags.DEFINE_boolean('median_filter', False,
+                     'True for median filter use.')
+flags.DEFINE_boolean('average_filter', False,
+                     'True for average filter use.')
+flags.DEFINE_boolean('mixture_of_filters', False,
+                     'True for mixture of filters.')
+flags.DEFINE_boolean('salt_pepper_noise', False,
+                     'True for original + salt_pepper noise training/evaluation.')
+flags.DEFINE_boolean('gaussian_noise', False,
+                     'True for original + gaussian noise training/evaluation.')
+flags.DEFINE_boolean('snow', False,
+                     'True for original + snow effect training.')
+flags.DEFINE_boolean('lowres', False,
+                     'True for low + high resolution training.')
+flags.DEFINE_integer('subsample_factor', 4, 'Subsampling factor ')
+flags.DEFINE_integer('resize_method', 0, 'Resize method '
+                     '0: bilinear, 1: nearest_neighbor'
+                     '2: bicubic, 3: area')
+flags.DEFINE_boolean('upsample', True,
+                     'True for low + high resolution training.')
 FLAGS = flags.FLAGS
 
 
@@ -118,13 +164,25 @@ def main(unused_argv):
   max_num_classes = max([item.id for item in label_map.item])
   categories = label_map_util.convert_label_map_to_categories(
       label_map, max_num_classes)
+  matching_iou_thresholds = [0.5]
+#  matching_iou_thresholds = [i/100. for i in range(50, 100, 5)]
 
   if FLAGS.run_once:
     eval_config.max_evals = 1
 
-  evaluator.evaluate(create_input_dict_fn, model_fn, eval_config, categories,
+  metrics = evaluator.evaluate(create_input_dict_fn, model_fn, eval_config, categories,
+                     matching_iou_thresholds,
                      FLAGS.checkpoint_dir, FLAGS.eval_dir)
 
+#  for key, value in sorted(metrics.iteritems()):
+#    if 'PerformanceByCategory' in key:
+#      print key, value
+#  mAP_list = []
+#  for key, value in sorted(metrics.iteritems()):
+#    if 'mAP' in key:
+#      print key, value
+#      mAP_list.append(value)
+#  print 'average mAP: ', sum(mAP_list)/len(mAP_list)
 
 if __name__ == '__main__':
   tf.app.run()

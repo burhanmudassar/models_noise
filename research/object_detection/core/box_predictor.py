@@ -87,7 +87,7 @@ class BoxPredictor(object):
           [batch_size, num_anchors, num_classes + 1] representing the class
           predictions for the proposals.
     """
-    with tf.variable_scope(scope):
+    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
       return self._predict(image_features, num_predictions_per_location,
                            **params)
 

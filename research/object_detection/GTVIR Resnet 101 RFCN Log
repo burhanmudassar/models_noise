@@ -1,0 +1,51 @@
+GTVIR Jun01 Noise=0.15
+
+PASCAL/PerformanceByCategory/AP@0.5IOU/bicycle 0.36160151055923784
+PASCAL/PerformanceByCategory/AP@0.5IOU/car 0.6229729325633202
+PASCAL/PerformanceByCategory/AP@0.5IOU/dog 0.35869356813987563
+PASCAL/PerformanceByCategory/AP@0.5IOU/motorcycle nan
+PASCAL/PerformanceByCategory/AP@0.5IOU/person 0.5245759977417677
+PASCAL/Precision/mAP@0.5IOU 0.4669610022510503
+average mAP:  0.4669610022510503
+
+GTVIR Jun01 Clean
+PASCAL/PerformanceByCategory/AP@0.5IOU/bicycle 0.9965986394557823
+PASCAL/PerformanceByCategory/AP@0.5IOU/car 0.8975054031820529
+PASCAL/PerformanceByCategory/AP@0.5IOU/dog 0.8374609044329707
+PASCAL/PerformanceByCategory/AP@0.5IOU/motorcycle nan
+PASCAL/PerformanceByCategory/AP@0.5IOU/person 0.9077341718817163
+PASCAL/Precision/mAP@0.5IOU 0.9098247797381306
+average mAP:  0.9098247797381306
+
+43114 Clean
+
+PASCAL/PerformanceByCategory/AP@0.5IOU/bicycle 1.0
+PASCAL/PerformanceByCategory/AP@0.5IOU/car 0.9012853810650087
+PASCAL/PerformanceByCategory/AP@0.5IOU/dog 0.7747691214061638
+PASCAL/PerformanceByCategory/AP@0.5IOU/motorcycle nan
+PASCAL/PerformanceByCategory/AP@0.5IOU/person 0.912980241621261
+PASCAL/Precision/mAP@0.5IOU 0.8972586860231083
+average mAP:  0.8972586860231083
+
+44417 Noise=0.15
+
+PASCAL/PerformanceByCategory/AP@0.5IOU/bicycle 0.4771905982096576
+PASCAL/PerformanceByCategory/AP@0.5IOU/car 0.8243788962886448
+PASCAL/PerformanceByCategory/AP@0.5IOU/dog 0.4234362716070122
+PASCAL/PerformanceByCategory/AP@0.5IOU/motorcycle nan
+PASCAL/PerformanceByCategory/AP@0.5IOU/person 0.7384211748092931
+PASCAL/Precision/mAP@0.5IOU 0.6158567352286519
+average mAP:  0.6158567352286519
+
+160398 Noise = 0.15
+
+PASCAL/PerformanceByCategory/AP@0.5IOU/bicycle 0.9264777064562434
+PASCAL/PerformanceByCategory/AP@0.5IOU/car 0.9368192637706884
+PASCAL/PerformanceByCategory/AP@0.5IOU/dog 0.839890310556067
+PASCAL/PerformanceByCategory/AP@0.5IOU/motorcycle nan
+PASCAL/PerformanceByCategory/AP@0.5IOU/person 0.9255753201665075
+PASCAL/Precision/mAP@0.5IOU 0.9071906502373766
+average mAP:  0.9071906502373766
+
+
+
